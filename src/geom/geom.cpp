@@ -3,3 +3,5 @@
 //  Thanda
 
 #include "geom.hpp"
+
+void Geometry::detectCollisions() {}
