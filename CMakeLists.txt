@@ -94,4 +94,5 @@ set(CORE_SRC
 )
 
 add_executable(Thanda ${CORE_SRC} src/viewer/SimpleVertexShader.vertexshader src/viewer/SimpleFragmentShader.fragmentshader)
+
 target_link_libraries(Thanda ${CORE_LIBS})
