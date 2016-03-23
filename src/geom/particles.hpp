@@ -9,32 +9,43 @@
 #include <vector>
 #include "geom.hpp"
 
-class Particles : public Geometry
+class Particle
+{
+public:
+    Particle(const glm::vec3 &pos, const glm::vec3 &vel) : position(pos), velocity(vel) {}
+    ~Particle();
+
+    glm::vec3 position;
+    glm::vec3 velocity;
+    int dead;
+};
+
+class ParticleContainer : public Geometry
 {
 public:
 //Constructors/destructors
-    Particles() {
+    ParticleContainer() {
         name = "PARTICLES";
         draw_type = GL_POINTS;
         transform = glm::mat4(1.0f);
     }
 //Functions
-    virtual ~Particles(){}
+    virtual ~ParticleContainer(){}
     virtual void create();
     void initParticles(const glm::vec3 &bounds, const glm::vec3 &container_bounds);
     virtual void detectCollisions();
 
-    std::vector<glm::vec3> positions;
-    std::vector<glm::vec3> speed;
-    std::vector<glm::vec3> colors;
-    std::vector<int> dead;
+    std::vector<Particle *> particles;
 
-    float minBoundX;
-    float minBoundY;
-    float minBoundZ;
-    float maxBoundX;
-    float maxBoundY;
-    float maxBoundZ;
+    float min_bound_x;
+    float min_bound_y;
+    float x_dim;
+    float min_bound_z;
+    float max_bound_x;
+    float y_dim;
+    float max_bound_y;
+    float max_bound_z;
+    float z_dim;
 
     float separation;
 };

@@ -40,7 +40,7 @@ void Scene::loadScene(const char *filename) {
     objects.push_back(box);
 
     // Get particle bounds.
-    Particles *fluid_particles = new Particles();
+    ParticleContainer *fluid_particles = new ParticleContainer();
     glm::vec3 particle_bounds = glm::vec3(root["particleDim"]["boundX"].asFloat(),
                                           root["particleDim"]["boundY"].asFloat(),
                                           root["particleDim"]["boundZ"].asFloat());
@@ -50,6 +50,10 @@ void Scene::loadScene(const char *filename) {
     fluid_particles->initParticles(particle_bounds, container_bounds);
     particles = fluid_particles;
     objects.push_back(fluid_particles);
+
+    // Create fluid solver
+    fluid_solver = FlipSolver(fluid_particles);
+    fluid_solver.init();
 }
 
 void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
@@ -97,5 +101,5 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
     }
 
     // Update particle positions
-    FluidSolver::updateParticles(particles);
+    fluid_solver.step();
 }

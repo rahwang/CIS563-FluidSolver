@@ -22,6 +22,10 @@ public:
     //Functions
     virtual ~Cube(){}
     virtual void create();
+
+    float x_dim;
+    float y_dim;
+    float z_dim;
 };
 
 

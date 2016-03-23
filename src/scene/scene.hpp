@@ -18,5 +18,6 @@ public:
     void drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera);
 
     std::vector<Geometry *> objects;
-    Particles *particles;
+    ParticleContainer *particles;
+    FlipSolver fluid_solver;
 };

@@ -87,6 +87,7 @@ set(CORE_SRC
         src/viewer/shader.cpp
         src/viewer/viewer.cpp
         src/fluidSolver/fluidSolver.cpp
+        src/fluidSolver/grid.cpp
         src/scene/scene.cpp
         src/geom/geom.cpp
         src/geom/cube.cpp
