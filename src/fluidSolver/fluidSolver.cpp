@@ -111,7 +111,6 @@ void FlipSolver::storeParticleVelocityToGrid() {
         // Do v_grid update.
         storeParticleVelocityToGridComponent(p, macgrid.v_grid, 1);
         normalizeGrid(macgrid.v_grid);
-        printGrid(macgrid.v_grid);
         // Do w_grid update.
         storeParticleVelocityToGridComponent(p, macgrid.w_grid, 2);
         normalizeGrid(macgrid.w_grid);
