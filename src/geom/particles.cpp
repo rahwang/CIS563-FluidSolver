@@ -23,7 +23,7 @@ void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &
         for (float j=0.f; j < bounds[1]; j += separation) {
             for (float k=0.f; k < bounds[2]; k += separation) {
                 glm::vec3 pos(i, j, k);
-                glm::vec3 vel = glm::vec3(0.f, -9.8f, 0.f);
+                glm::vec3 vel = glm::vec3(0.f, 0.f, 0.f);
                 particles.push_back(new Particle(pos, vel));
                 //std::cout << vel[0] << " " << vel[1] << " " << vel[2] << std::endl;
             }
@@ -55,15 +55,9 @@ void ParticleContainer::create() {
         g_vertex_buffer_data.push_back(p->position[1]);
         g_vertex_buffer_data.push_back(p->position[2]);
 
-        if (p->dead) {
-            g_color_buffer_data.push_back(1.0f);
-            g_color_buffer_data.push_back(1.0f);
-            g_color_buffer_data.push_back(1.0f);
-        } else {
-            g_color_buffer_data.push_back(0.0f);
-            g_color_buffer_data.push_back(0.0f);
-            g_color_buffer_data.push_back(0.5f);
-        }
+        g_color_buffer_data.push_back(0.0f);
+        g_color_buffer_data.push_back(0.0f);
+        g_color_buffer_data.push_back(0.5f);
     }
 
     glGenBuffers(1, &vertexbuffer);

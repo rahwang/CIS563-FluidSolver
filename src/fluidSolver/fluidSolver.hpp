@@ -26,17 +26,18 @@ public:
   void step();
 
   glm::vec3 getVelocityGridIndex(const glm::vec3 &pos, int dim);
-  glm::vec3 getPressureGridIndex(const glm::vec3 &pos);
+  glm::vec3 getGridIndex(const glm::vec3 &pos);
 
   void constructMacGrid(int x, int y, int z);
-  void storeParticleVelocityToGridComponent(Particle *p, Grid &grid, int dim);
+  void storeParticleVelocityToGridComponent(Particle *p, Grid<float> &grid, int dim);
   void storeParticleVelocityToGrid();
 
   void clearGrids();
-  void normalizeGrid(Grid &grid);
 
-  float interpolateVelocityComponent(Particle *p, const Grid &grid, int dim);
+  float interpolateVelocityComponent(Particle *p, const Grid<float> &grid, int dim);
   void interpolateVelocity();
+  void applyGravity();
+  void updateParticlePositions();
 
   MacGrid macgrid;
 };
