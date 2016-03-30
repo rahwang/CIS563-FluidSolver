@@ -39,12 +39,12 @@ public:
 
     float min_bound_x;
     float min_bound_y;
-    float x_dim;
     float min_bound_z;
     float max_bound_x;
-    float y_dim;
     float max_bound_y;
     float max_bound_z;
+    float x_dim;
+    float y_dim;
     float z_dim;
 
     float separation;

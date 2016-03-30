@@ -5,9 +5,10 @@
 #include "fluidSolver.hpp"
 #include <iostream>
 
-#define TIME_STEP (1/10000.f)
-#define RES 1
-#define CELL_WIDTH 1.f/RES
+#define GRAVITY -9.8f
+#define TIME_STEP (1.0f/10.f)
+#define RES 4
+#define CELL_WIDTH (1.f/RES)
 
 void FlipSolver::step()
 {
@@ -15,20 +16,136 @@ void FlipSolver::step()
     clearGrids();
     // Transfer particle velocities to grid (Also marks cell types).
     storeParticleVelocityToGrid();
-    // TODO: Apply forces.
+    // Zero velocities pointing into solid cells.
+    enforceBoundaryConditions();
     applyGravity();
-    // TODO: Enforce boundary collisions.
-    particle_container->detectCollisions();
     // TODO: Pressure step.
+    // Handle air/fluid boundaries.
+    //extrapolateVelocities();
     // Update particle velocities.
-    //interpolateVelocity();
-    // Update particle positions.
+    interpolateVelocity();
     updateParticlePositions();
+    handleCollisions();
 }
 
 
-// Using RK2 method.
-void FlipSolver::updateParticlePositions() {
+void FlipSolver::extrapolateVelocities() {
+    for (int i=0; i < particle_container->min_bound_x; ++i)
+    {
+        for (int j=0; j < particle_container->min_bound_y; ++j)
+        {
+            for (int k=0; k < particle_container->min_bound_z; ++k)
+            {
+                if (macgrid.cellTypes(i, j, k) == macgrid.cellTypes.AIR)
+                {
+                    for (int n=-1; n < 2; ++n)
+                    {
+                        for (int m=-1; m < 2; ++m)
+                        {
+                            for (int o=-1; o < 2; ++o)
+                            {
+                                int I = i+n;
+                                int J = j+m;
+                                int K = k+o;
+                                if (((I >= 0 && I < particle_container->x_dim)
+                                     && (J >= 0 && J < particle_container->y_dim))
+                                    && (K >= 0 && K < particle_container->z_dim))
+                                {
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+void FlipSolver::handleCollisions()
+{
+    for (Particle *p : particle_container->particles)
+    {
+        // Check to see if p is inside bounding volume
+        if (p->position[0] < particle_container->min_bound_x || p->position[0] > particle_container->max_bound_x)
+        {
+            p->position[0] = std::min(std::max(p->position[0], particle_container->min_bound_x), particle_container->max_bound_x);
+            p->velocity[0] *= -0.5;
+        }
+        if (p->position[1] < particle_container->min_bound_y || p->position[1] > particle_container->max_bound_y)
+        {
+            p->position[1] = std::min(std::max(p->position[1], particle_container->min_bound_y), particle_container->max_bound_y);
+            p->velocity[1] *= -0.5f;
+        }
+        if (p->position[2] < particle_container->min_bound_z || p->position[2] > particle_container->max_bound_z)
+        {
+            p->position[2] = std::min(std::max(p->position[2], particle_container->min_bound_z), particle_container->max_bound_z);
+            p->velocity[2] *= -0.5;
+        }
+    }
+}
+
+
+void FlipSolver::enforceBoundaryConditions()
+{
+    // Iterate through all the grids.
+    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    {
+        for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+        {
+            for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+            {
+                // Check to see if the cell is solid.
+                if (macgrid.cellTypes(i, j, k) = macgrid.p_grid.SOLID)
+                {
+                    // For the min faces, zero velocity into cell.
+                    macgrid.u(i, j, k) = std::min(0.f, macgrid.u(i, j, k));
+                    macgrid.v(i, j, k) = std::min(0.f, macgrid.v(i, j, k));
+                    macgrid.w(i, j, k) = std::min(0.f, macgrid.w(i, j, k));
+
+                    for (int ii=i; ii < i+1; ++ii)
+                    {
+                        for (int jj=j; jj < j+1; ++jj)
+                        {
+                            for (int kk=k; kk < k+1; ++kk)
+                            {
+                                // For the max faces, zero velocity into cell.
+                                if (ii < macgrid.u.x_dim && jj < macgrid.u.y_dim && kk < macgrid.u.z_dim)
+                                    macgrid.u(ii, jj, kk) = std::max(0.f, macgrid.u(i+1, j, k));
+                                if (jj < macgrid.v.x_dim && jj < macgrid.v.y_dim && kk < macgrid.v.z_dim)
+                                    macgrid.v(ii, jj, kk) = std::max(0.f, macgrid.v(i+1, j, k));
+                                if (kk < macgrid.w.x_dim && jj < macgrid.w.y_dim && kk < macgrid.w.z_dim)
+                                    macgrid.w(ii, jj, kk) = std::max(0.f, macgrid.w(i+1, j, k));
+                            }
+                        }
+                    }
+                }
+                
+                // For the min borders, zero velocity out of fluid bounds.
+                if (i == 0)
+                    macgrid.u(i, j, k) = std::max(0.f, macgrid.u(i, j, k));
+                if (j == 0)
+                    macgrid.v(i, j, k) = std::max(0.f, macgrid.v(i, j, k));
+                if (j == 0)
+                    macgrid.w(i, j, k) = std::max(0.f, macgrid.w(i, j, k));
+    
+                // For the max borders, zero velocity out of fluid bounds.
+                if (i == macgrid.p_grid.x_dim-1)
+                    macgrid.u(i+1, j, k) = std::min(0.f, macgrid.u(i+1, j, k));
+                if (j == macgrid.p_grid.y_dim-1)
+                    macgrid.v(i, j+1, k) = std::min(0.f, macgrid.v(i, j+1, k));
+                if (k == macgrid.p_grid.z_dim-1)
+                    macgrid.w(i, j, k+1) = std::min(0.f, macgrid.w(i, j, k+1));
+                
+            }
+        }
+    }
+}
+
+
+// Using forward Euler for now.
+void FlipSolver::updateParticlePositions()
+{
     for (Particle *p : particle_container->particles)
     {
         p->position += p->velocity * TIME_STEP;
@@ -44,6 +161,7 @@ void FlipSolver::init()
     int z = int(ceil(particle_container->z_dim));
 
     constructMacGrid(x, y, z);
+    applyGravity();
 }
 
 
@@ -56,16 +174,20 @@ void FlipSolver::constructMacGrid(int x, int y, int z)
 
 void FlipSolver::clearGrids()
 {
-    macgrid.u_grid.clear();
-    macgrid.v_grid.clear();
-    macgrid.w_grid.clear();
+    macgrid.u.copyCells(macgrid.u_old);
+    macgrid.v.copyCells(macgrid.v_old);
+    macgrid.w.copyCells(macgrid.w_old);
+
+    macgrid.u.clearVelocity();
+    macgrid.v.clearVelocity();
+    macgrid.w.clearVelocity();
     macgrid.cellTypes.clear();
 }
 
 
 void FlipSolver::applyGravity()
 {
-    macgrid.v_grid.applyToCells(-9.8f);
+    macgrid.v.applyToCells(GRAVITY * TIME_STEP);
 }
 
 
@@ -85,11 +207,18 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
                 int I = i+n;
                 int J = j+m;
                 int K = k+o;
-                if (((I >= 0 && I < particle_container->x_dim)
-                        && (J >= 0 && J < particle_container->y_dim))
-                        && (K >= 0 && K < particle_container->z_dim))
+                if (((I >= 0 && I < grid.x_dim)
+                        && (J >= 0 && J < grid.y_dim))
+                        && (K >= 0 && K < grid.z_dim))
                 {
-                    grid(I, J, K) += p->velocity[dim];
+                    // Calculate weight based on distance from cell center.
+                    float x = particle_container->min_bound_x + ((I + 0.5f) * CELL_WIDTH);
+                    float y = particle_container->min_bound_y + ((J + 0.5f) * CELL_WIDTH);
+                    float z = particle_container->min_bound_z + ((K + 0.5f) * CELL_WIDTH);
+                    float weight = 1.0f / glm::length(glm::vec3(x, y, z)-p->position);
+                    
+                    // Store velocity contribution and increment particle counter.
+                    grid(I, J, K) += weight * p->velocity[dim];
                     grid.incrementParticleCount(I, J, K);
                 }
             }
@@ -107,16 +236,16 @@ void FlipSolver::storeParticleVelocityToGrid()
     for (Particle *p : particle_container->particles)
     {
         // Do u_grid update.
-        storeParticleVelocityToGridComponent(p, macgrid.u_grid, 0);
+        storeParticleVelocityToGridComponent(p, macgrid.u, 0);
         // Do v_grid update.
-        storeParticleVelocityToGridComponent(p, macgrid.v_grid, 1);
+        storeParticleVelocityToGridComponent(p, macgrid.v, 1);
         // Do w_grid update.
-        storeParticleVelocityToGridComponent(p, macgrid.w_grid, 2);
+        storeParticleVelocityToGridComponent(p, macgrid.w, 2);
     }
-    macgrid.u_grid.normalizeCells();
-    macgrid.v_grid.normalizeCells();
-    macgrid.v_grid.printGrid();
-    macgrid.w_grid.normalizeCells();
+    macgrid.u.normalizeCells();
+    macgrid.v.normalizeCells();
+    //macgrid.v_grid.printGrid();
+    macgrid.w.normalizeCells();
 }
 
 
@@ -154,7 +283,7 @@ glm::vec3 FlipSolver::getGridIndex(const glm::vec3 &pos)
 
 float lerp(float p1, float p2, float u)
 {
-    return p1*u + p2*(1-u);
+    return p2*u + p1*(1.0f-u);
 }
 
 
@@ -177,6 +306,8 @@ float FlipSolver::interpolateVelocityComponent(Particle *p, const Grid<float> &g
     float tmp3 = MATHIF(i!=ii, lerp(grid(i, j, kk), grid(ii, j, kk), x_uVal), grid(i, j, kk));
     float tmp4 = MATHIF(i!=ii, lerp(grid(i, jj, kk), grid(ii, jj, kk), x_uVal), grid(i, jj, kk));
 
+    //std::cout << tmp1 << " " << tmp2 << " " << tmp3 << " " << tmp4 << std::endl;
+
     // Do y direction.
     float y_uVal = (p->position[1] - ((j * CELL_WIDTH) + particle_container->min_bound_y)) / CELL_WIDTH;
     float tmp5 = MATHIF(j!=jj, lerp(tmp1, tmp2, y_uVal), tmp1);
@@ -184,17 +315,43 @@ float FlipSolver::interpolateVelocityComponent(Particle *p, const Grid<float> &g
 
     // Do z direction.
     float z_uVal = (p->position[2] - ((k * CELL_WIDTH) + particle_container->min_bound_z)) / CELL_WIDTH;
-    return MATHIF(k!=kk, lerp(tmp5, tmp6, z_uVal), tmp5);
+    float THING = MATHIF(k!=kk, lerp(tmp5, tmp6, z_uVal), tmp5);
+    return THING;
 }
+
+
+void FlipSolver::storeDeltaVelocity(Grid<float> &old_grid, const Grid<float> &grid)
+{
+    int numCells = old_grid.getNumCells();
+    for (int i=0; i < numCells; ++i)
+    {
+        old_grid(i) = grid(i) - old_grid(i);
+    }
+}
+
 
 void FlipSolver::interpolateVelocity()
 {
+    storeDeltaVelocity(macgrid.u_old, macgrid.u);
+    storeDeltaVelocity(macgrid.v_old, macgrid.v);
+    storeDeltaVelocity(macgrid.w_old, macgrid.w);
+    
     for (Particle *p : particle_container->particles)
     {
-        p->velocity[0] = interpolateVelocityComponent(p, macgrid.u_grid, 0);
-        p->velocity[1] = interpolateVelocityComponent(p, macgrid.v_grid, 1);
-        p->velocity[2] = interpolateVelocityComponent(p, macgrid.w_grid, 2);
+        // Get PIC components.
+        float pic_x = interpolateVelocityComponent(p, macgrid.u, 0);
+        float pic_y = interpolateVelocityComponent(p, macgrid.v, 1);
+        float pic_z = interpolateVelocityComponent(p, macgrid.w, 2);
+        
+        // Get FLIP components. "old" grids currently contain delta velocity.
+        float flip_x = p->velocity[0] + interpolateVelocityComponent(p, macgrid.u_old, 0);
+        float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
+        float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
+        
+        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
+        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
+        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
 
-        //std::cout << p->position[0] << " " << p->position[1] << " " << p->position[2];
+        //std::cout << p->velocity[1] << std::endl;
     }
 }

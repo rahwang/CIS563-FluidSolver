@@ -38,6 +38,10 @@ public:
   void interpolateVelocity();
   void applyGravity();
   void updateParticlePositions();
+  void handleCollisions();
+  void enforceBoundaryConditions();
+  void extrapolateVelocities();
+  void storeDeltaVelocity(Grid<float> &old_grid, const Grid<float> &grid);
 
   MacGrid macgrid;
 };
