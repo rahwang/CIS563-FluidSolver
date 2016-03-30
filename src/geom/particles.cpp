@@ -9,19 +9,21 @@
 void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &container_bounds) {
     particles.clear();
 
-    min_bound_x = -container_bounds[0];
-    min_bound_y = -container_bounds[1];
-    min_bound_z = -container_bounds[2];
-    max_bound_x = container_bounds[0];
-    max_bound_y = container_bounds[1];
-    max_bound_z = container_bounds[2];
-    x_dim = max_bound_x - min_bound_x;
-    y_dim = max_bound_y - min_bound_y;
-    z_dim = max_bound_z - min_bound_z;
+    min_x = -container_bounds[0];
+    min_y = -container_bounds[1];
+    min_z = -container_bounds[2];
+    max_x = container_bounds[0];
+    max_y = container_bounds[1];
+    max_z = container_bounds[2];
+    x_dim = max_x - min_x;
+    y_dim = max_y - min_y;
+    z_dim = max_z - min_z;
 
-    for (float i=0.f; i < bounds[0] ; i += separation) {
-        for (float j=0.f; j < bounds[1]; j += separation) {
-            for (float k=0.f; k < bounds[2]; k += separation) {
+    // Divide by two to center around the origin.
+    glm::vec3 centered_bounds = bounds / 2.f;
+    for (float i=-centered_bounds[0]; i < centered_bounds[0]; i += separation) {
+        for (float j=-centered_bounds[1]; j < centered_bounds[1]; j += separation) {
+            for (float k=-centered_bounds[2]; k < centered_bounds[2]; k += separation) {
                 glm::vec3 pos(i, j, k);
                 glm::vec3 vel = glm::vec3(0.f, 0.f, 0.f);
                 particles.push_back(new Particle(pos, vel));
@@ -38,9 +40,9 @@ void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &
 void ParticleContainer::detectCollisions() {
 
     for (Particle *p : particles) {
-        p->dead = ((p->position[0] < min_bound_x || p->position[0] > max_bound_x)
-                || (p->position[1] < min_bound_y || p->position[1] > max_bound_y)
-                || (p->position[2] < min_bound_z || p->position[2] > max_bound_z));
+        p->dead = ((p->pos[0] < min_x || p->pos[0] > max_x)
+                || (p->pos[1] < min_y || p->pos[1] > max_y)
+                || (p->pos[2] < min_z || p->pos[2] > max_z));
     }
 }
 
@@ -51,9 +53,9 @@ void ParticleContainer::create() {
     std::vector<GLfloat> g_color_buffer_data;
 
     for (Particle *p : particles) {
-        g_vertex_buffer_data.push_back(p->position[0]);
-        g_vertex_buffer_data.push_back(p->position[1]);
-        g_vertex_buffer_data.push_back(p->position[2]);
+        g_vertex_buffer_data.push_back(p->pos[0]);
+        g_vertex_buffer_data.push_back(p->pos[1]);
+        g_vertex_buffer_data.push_back(p->pos[2]);
 
         g_color_buffer_data.push_back(0.0f);
         g_color_buffer_data.push_back(0.0f);

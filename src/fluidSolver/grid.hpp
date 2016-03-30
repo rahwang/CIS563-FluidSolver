@@ -7,6 +7,7 @@
 
 #include "../geom/particles.hpp"
 #include <iostream>
+#include <cassert>
 
 #define MATHIF(test, if_true, if_false) (((if_true) * (test)) + ((if_false) * (1 - (test))))
 
@@ -21,46 +22,62 @@ public:
     int x_dim;
     int y_dim;
     int z_dim;
+    int maxIndex;
 
     Grid() {}
     Grid(int x, int y, int z) : x_dim(x), y_dim(y), z_dim(z) {
         cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
         particleCount = std::vector<int>(x_dim*y_dim*z_dim, 0);
+        maxIndex = x_dim*y_dim*z_dim;
     }
     ~Grid() {}
 
     T& operator() (int i, int j, int k)
     {
-        return cells[i + y_dim * (j + z_dim * k)];
+//        assert(i >= 0 && j >= 0 && k >= 0);
+//        assert(i < x_dim && j < y_dim && k < z_dim);
+//        assert(i + x_dim * (j + y_dim * k) < maxIndex);
+        return cells[i + x_dim * (j + y_dim * k)];
     }
 
     const T& operator() (int i, int j, int k) const
     {
-        return cells[i + y_dim * (j + z_dim * k)];
+//        assert(i >= 0 && j >= 0 && k >= 0);
+//        assert(i < x_dim && j < y_dim && k < z_dim);
+//        assert(i + x_dim * (j + y_dim * k) < maxIndex);
+        return cells[i + x_dim * (j + y_dim * k)];
     }
     
     T& operator() (int i)
     {
+        assert(i >= 0 && i < maxIndex);
         return cells[i];
     }
     
     const T& operator() (int i) const
     {
+        assert(i >= 0 && i < maxIndex);
         return cells[i];
     }
 
     int getParticleCount(int i, int j, int k)
     {
-        return particleCount[i + y_dim * (j + z_dim * k)];
+        assert(i >= 0 && j >= 0 && k >= 0);
+        assert(i < x_dim && j < y_dim && k < z_dim);
+        return particleCount.at(i + x_dim * (j + y_dim * k));
     }
 
     void incrementParticleCount(int i, int j, int k)
     {
-        particleCount[i + y_dim * (j + z_dim * k)]++;
+        assert(i >= 0 && j >= 0 && k >= 0);
+        assert(i < x_dim && j < y_dim && k < z_dim);
+        particleCount.at(i + x_dim * (j + y_dim * k))++;
     }
 
     void clearVelocity()
     {
+        cells.clear();
+        particleCount.clear();
         cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
         particleCount = std::vector<int>(x_dim*y_dim*z_dim, 0);
     }

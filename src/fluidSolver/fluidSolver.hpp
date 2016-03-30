@@ -35,12 +35,12 @@ public:
   void clearGrids();
 
   float interpolateVelocityComponent(Particle *p, const Grid<float> &grid, int dim);
-  void interpolateVelocity();
+  void gridVelocityToParticle();
   void applyGravity();
   void updateParticlePositions();
   void handleCollisions();
   void enforceBoundaryConditions();
-  void extrapolateVelocities();
+  void extrapolateVelocity();
   void storeDeltaVelocity(Grid<float> &old_grid, const Grid<float> &grid);
 
   MacGrid macgrid;
