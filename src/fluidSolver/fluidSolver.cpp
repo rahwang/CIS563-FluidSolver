@@ -4,12 +4,15 @@
 
 #include "fluidSolver.hpp"
 #include <iostream>
+#include <tbb/tbb.h>
 
 #define GRAVITY -9.8f
 #define TIME_STEP (1.0f/10.f)
 #define RES 4
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
+
+//#define TBB 1
 
 void FlipSolver::step()
 {
@@ -83,6 +86,29 @@ void FlipSolver::extrapolateVelocity() {
 
 void FlipSolver::handleCollisions()
 {
+#ifdef TBB
+    int size = particle_container->particles.size();
+    tbb::parallel_for(0, size, 1, [=](int i)
+    {
+        Particle *p = particle_container->particles[i];
+        // Check to see if p is inside bounding volume
+        if (p->pos[0] < particle_container->min_x || p->pos[0] > particle_container->max_x)
+        {
+            p->pos[0] = std::min(std::max(p->pos[0], particle_container->min_x), particle_container->max_x);
+            p->velocity[0] *= -DAMPING;
+        }
+        if (p->pos[1] < particle_container->min_y || p->pos[1] > particle_container->max_y)
+        {
+            p->pos[1] = std::min(std::max(p->pos[1], particle_container->min_y), particle_container->max_y);
+            p->velocity[1] *= -DAMPING;
+        }
+        if (p->pos[2] < particle_container->min_z || p->pos[2] > particle_container->max_z)
+        {
+            p->pos[2] = std::min(std::max(p->pos[2], particle_container->min_z), particle_container->max_z);
+            p->velocity[2] *= -DAMPING;
+        }
+    });
+#else
     for (Particle *p : particle_container->particles)
     {
         // Check to see if p is inside bounding volume
@@ -102,6 +128,7 @@ void FlipSolver::handleCollisions()
             p->velocity[2] *= -DAMPING;
         }
     }
+#endif
 }
 
 
@@ -251,6 +278,19 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
 
 void FlipSolver::storeParticleVelocityToGrid()
 {
+#ifdef TBB
+    int size = particle_container->particles.size();
+    tbb::parallel_for(0, size, 1, [=](int i)
+    {
+        Particle *p = particle_container->particles[i];
+        // Do u_grid update.
+        storeParticleVelocityToGridComponent(p, macgrid.u, 0);
+        // Do v_grid update.
+        storeParticleVelocityToGridComponent(p, macgrid.v, 1);
+        // Do w_grid update.
+        storeParticleVelocityToGridComponent(p, macgrid.w, 2);
+    }
+#else
     for (Particle *p : particle_container->particles)
     {
         // Do u_grid update.
@@ -260,6 +300,7 @@ void FlipSolver::storeParticleVelocityToGrid()
         // Do w_grid update.
         storeParticleVelocityToGridComponent(p, macgrid.w, 2);
     }
+#endif
     macgrid.u.normalizeCells();
     macgrid.v.normalizeCells();
     macgrid.w.normalizeCells();
@@ -353,6 +394,27 @@ void FlipSolver::gridVelocityToParticle()
     storeDeltaVelocity(macgrid.v_old, macgrid.v);
     storeDeltaVelocity(macgrid.w_old, macgrid.w);
     
+#ifdef TBB
+    int size = particle_container->particles.size();
+    tbb::parallel_for(0, size, 1, [=](int i)
+    {
+        Particle *p = particle_container->particles[i];
+        
+        // Get PIC components.
+        float pic_x = interpolateVelocityComponent(p, macgrid.u, 0);
+        float pic_y = interpolateVelocityComponent(p, macgrid.v, 1);
+        float pic_z = interpolateVelocityComponent(p, macgrid.w, 2);
+        
+        // Get FLIP components. "old" grids currently contain delta velocity.
+        float flip_x = p->velocity[0] + interpolateVelocityComponent(p, macgrid.u_old, 0);
+        float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
+        float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
+        
+        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
+        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
+        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
+    });
+#else
     for (Particle *p : particle_container->particles)
     {
         // Get PIC components.
@@ -371,4 +433,5 @@ void FlipSolver::gridVelocityToParticle()
 
         //std::cout << p->velocity[1] << std::endl;
     }
+#endif
 }

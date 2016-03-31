@@ -11,6 +11,8 @@
 
 #define MATHIF(test, if_true, if_false) (((if_true) * (test)) + ((if_false) * (1 - (test))))
 
+// #define TBB 1
+
 template <class T>
 class Grid {
 private:
@@ -114,11 +116,19 @@ public:
 
     void normalizeCells()
     {
+#ifdef TBB
+        int size = cells.size();
+        tbb::parallel_for(0, size, 1, [=](int i)
+        {
+            cells[i] /= MATHIF(particleCount[i] > 0, particleCount[i], 1.0f);
+        }
+#else
         int numCells = cells.size();
         for (int i=0; i < numCells; ++i)
         {
             cells[i] /= MATHIF(particleCount[i] > 0, particleCount[i], 1.0f);
         }
+#endif
     }
     
     int getNumCells()
