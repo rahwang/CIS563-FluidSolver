@@ -25,6 +25,7 @@ void FlipSolver::step()
     enforceBoundaryConditions();
     applyGravity();
     // TODO: Pressure step.
+    enforceBoundaryConditions();
     // Handle air/fluid boundaries.
     extrapolateVelocity();
     // Update particle velocities.
@@ -34,18 +35,105 @@ void FlipSolver::step()
 }
 
 
+void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
+{
+    // Index between 1 and dim-1 because we know the wells of our tank are solid.
+    for (int i=1; i < macgrid.marker.x_dim-1; ++i)
+    {
+        for (int j=1; j < macgrid.marker.y_dim-1; ++j)
+        {
+            for (int k=1; k < macgrid.marker.z_dim-1; ++k)
+            {
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    // This is a count of the EMPTY | FLUID neighboring cells.
+                    if (macgrid.marker(i, j, k) == macgrid.marker.FLUID) {
+                        int count = 0;
+                        // RIGHT
+                        if (macgrid.marker(i+1, j, k) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i+1, j, k),
+                                                   -1));
+                            count++;
+                        }
+                        // LEFT
+                        if (macgrid.marker(i-1, j, k) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i-1, j, k),
+                                                   -1));
+                            count++;
+                        }
+                        // UP
+                        if (macgrid.marker(i, j+1, k) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i, j+1, k),
+                                                   -1));
+                            count++;
+                        }
+                        // DOWN
+                        if (macgrid.marker(i, j-1, k) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i, j-1, k),
+                                                   -1));
+                            count++;
+                        }
+                        // FRONT
+                        if (macgrid.marker(i, j, k+1) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i, j, k+1),
+                                                   -1));
+                            count++;
+                        }
+                        // BEHIND
+                        if (macgrid.marker(i, j, k-1) != macgrid.marker.SOLID)
+                        {
+                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                                   macgrid.marker.flatIdx(i, j, k-1),
+                                                   -1));
+                            count++;
+                        }
+                        coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                                               macgrid.marker.flatIdx(i, j, k),
+                                               count));
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
 void FlipSolver::computePressure()
 {
-    int n = macgrid.p_grid.getNumCells();
+    int n = macgrid.p.getNumCells();
     int m = n*n;
 
-    // To be passed to coefficient matrix.
-    std::vector<T> coefficients;
-
-    // b vector of divergences
+    // Build b vector of divergences
     Eigen::VectorXd b(n);
+    int idx = 0;
+    for (int i=0; i < macgrid.p.x_dim; ++i)
+    {
+        for (int j=0; j < macgrid.p.y_dim; ++j)
+        {
+            for (int k=0; k < macgrid.p.z_dim; ++k)
+            {
+                float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
+                float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
+                float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
+                b[idx++] = u_div+v_div+w_div;
+            }
+        }
+    }
 
-    //buildProblem(coefficients, b, n);
+    // Assemble coeff vector to be passed to coefficient matrix.
+    std::vector<T> coefficients;
+    assemblePressureSolveCoefficients(coefficients);
 
     // The coefficient matrix
     SpMat A(m,m);
@@ -54,31 +142,80 @@ void FlipSolver::computePressure()
     // Solving for pressure
     Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
     Eigen::VectorXd x = chol.solve(b);         // use factorization to solve for the given right hand side
-    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
-    {
-        for (int j=0; j < macgrid.p_grid.y_dim; ++j)
-        {
-            for (int k=0; k < macgrid.p_grid.z_dim; ++k)
-            {
 
+}
+
+
+void FlipSolver::setSolidCells()
+{
+    for (int i=0; i < macgrid.p.x_dim; ++i)
+    {
+        for (int j=0; j < macgrid.p.y_dim; ++j)
+        {
+            for (int k=0; k < macgrid.p.z_dim; ++k)
+            {
+                if (i == 0 || j == 0 || k == 0 ||
+                    i == macgrid.p.x_dim-1 || j == macgrid.p.y_dim -1 || k == macgrid.p.z_dim-1)
+                {
+                    macgrid.marker(i, j, k) == macgrid.marker.SOLID;
+                }
             }
         }
     }
 }
 
 
-void FlipSolver::setSolidCells()
+void FlipSolver::extrapolateVelocityComponent(const Grid<int>& tmp, Grid<float>& grid)
 {
-    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    for (int i=0; i < grid.x_dim; ++i)
     {
-        for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+        for (int j=0; j < grid.y_dim; ++j)
         {
-            for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+            for (int k=0; k < grid.z_dim; ++k)
             {
-                if (i == 0 || j == 0 || k == 0 ||
-                    i == macgrid.p_grid.x_dim-1 || j == macgrid.p_grid.y_dim -1 || k == macgrid.p_grid.z_dim-1)
+                float accum = 0.f;
+                int count = 0;
+                if (tmp(i, j, k) != macgrid.marker.FLUID)
                 {
-                    macgrid.cellTypes(i, j, k) == macgrid.cellTypes.SOLID;
+                    // RIGHT
+                    if (i+1 < grid.x_dim && tmp(i+1, j, k) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i+1, j, k);
+                        count++;
+                    }
+                    // LEFT
+                    if (i-1 >= 0 && tmp(i-1, j, k) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i-1, j, k);
+                        count++;
+                    }
+                    // UP
+                    if (j+1 < grid.y_dim && tmp(i, j+1, k) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i, j+1, k);
+                        count++;
+                    }
+                    // DOWN
+                    if (j-1 >= 0 && tmp(i, j-1, k) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i, j-1, k);
+                        count++;
+                    }
+                    // FRONT
+                    if (k+1 < grid.z_dim && tmp(i, j, k+1) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i, j, k+1);
+                        count++;
+                    }
+                    // BEHIND
+                    if (k-1 >= 0 && tmp(i, j, k-1) == macgrid.marker.FLUID)
+                    {
+                        accum += grid(i, j, k-1);
+                        count++;
+                    }
+                    // Store extrapolated velocity.
+                    if (count > 0)
+                        grid(i, j, k) = accum / count;
                 }
             }
         }
@@ -91,41 +228,75 @@ void FlipSolver::extrapolateVelocity()
     // Create temporary grids marking "near fluid" cells as fluid cells.
     // These temporary grids will hold {FLUID | AIR} all AIR cells adjacent
     // to FLUID cells in the temporary grids need extrapolation.
-    Grid<float> tmp_u(macgrid.u.x_dim, macgrid.u.y_dim, macgrid.u.z_dim);
-    Grid<float> tmp_v(macgrid.v.x_dim, macgrid.v.y_dim, macgrid.v.z_dim);
-    Grid<float> tmp_w(macgrid.w.x_dim, macgrid.w.y_dim, macgrid.w.z_dim);
+    Grid<int> tmp_u(macgrid.u.x_dim, macgrid.u.y_dim, macgrid.u.z_dim);
+    Grid<int> tmp_v(macgrid.v.x_dim, macgrid.v.y_dim, macgrid.v.z_dim);
+    Grid<int> tmp_w(macgrid.w.x_dim, macgrid.w.y_dim, macgrid.w.z_dim);
 
     tmp_u.clear();
     tmp_v.clear();
     tmp_w.clear();
 
-    for (int i=1; i < macgrid.p_grid.x_dim; ++i)
+    // Populate u temp grid.
+    for (int i=1; i < macgrid.u.x_dim; ++i)
     {
-        for (int j=1; j < macgrid.p_grid.y_dim; ++j)
+        for (int j=1; j < macgrid.u.y_dim; ++j)
         {
-            for (int k=1; k < macgrid.p_grid.z_dim; ++k)
+            for (int k=1; k < macgrid.u.z_dim; ++k)
             {
-                if (macgrid.cellTypes(i, j, k) == macgrid.cellTypes.FLUID)
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                 {
-                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
-                    tmp_v(i, j, k) = macgrid.cellTypes.FLUID;
-                    tmp_w(i, j, k) = macgrid.cellTypes.FLUID;
+                    tmp_u(i, j, k) = macgrid.marker.FLUID;
                 }
-                else if (macgrid.cellTypes(i-1, j, k) == macgrid.cellTypes.FLUID)
+                else if (macgrid.marker(i-1, j, k) == macgrid.marker.FLUID)
                 {
-                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
-                }
-                else if (macgrid.cellTypes(i, j-1, k) == macgrid.cellTypes.FLUID)
-                {
-                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
-                }
-                else if (macgrid.cellTypes(i, j, k-1) == macgrid.cellTypes.FLUID)
-                {
-                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
+                    tmp_u(i, j, k) = macgrid.marker.FLUID;
                 }
             }
         }
     }
+
+    // Populate v temp grid.
+    for (int i=1; i < macgrid.v.x_dim; ++i)
+    {
+        for (int j=1; j < macgrid.v.y_dim; ++j)
+        {
+            for (int k=1; k < macgrid.v.z_dim; ++k)
+            {
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    tmp_v(i, j, k) = macgrid.marker.FLUID;
+                }
+                else if (macgrid.marker(i, j-1, k) == macgrid.marker.FLUID)
+                {
+                    tmp_v(i, j, k) = macgrid.marker.FLUID;
+                }
+            }
+        }
+    }
+
+    // Populate w temp grid.
+    for (int i=1; i < macgrid.w.x_dim; ++i)
+    {
+        for (int j=1; j < macgrid.w.y_dim; ++j)
+        {
+            for (int k=1; k < macgrid.w.z_dim; ++k)
+            {
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    tmp_w(i, j, k) = macgrid.marker.FLUID;
+                }
+                else if (macgrid.marker(i, j, k-1) == macgrid.marker.FLUID)
+                {
+                    tmp_w(i, j, k) = macgrid.marker.FLUID;
+                }
+            }
+        }
+    }
+
+    // Now for all non-fluid cells that border fluid in the tmp grids, extrapolate.
+    extrapolateVelocityComponent(tmp_u, macgrid.u);
+    extrapolateVelocityComponent(tmp_v, macgrid.v);
+    extrapolateVelocityComponent(tmp_w, macgrid.w);
 }
 
 
@@ -180,9 +351,9 @@ void FlipSolver::handleCollisions()
 void FlipSolver::enforceBoundaryConditions()
 {
     // Enforce for u velocity.
-    for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+    for (int j=0; j < macgrid.p.y_dim; ++j)
     {
-        for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+        for (int k=0; k < macgrid.p.z_dim; ++k)
         {
             macgrid.u(0, j, k) = 0.f;
             macgrid.u(1, j, k) = 0.f;
@@ -192,9 +363,9 @@ void FlipSolver::enforceBoundaryConditions()
     }
 
     // Enforce for v velocity.
-    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    for (int i=0; i < macgrid.p.x_dim; ++i)
     {
-        for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+        for (int k=0; k < macgrid.p.z_dim; ++k)
         {
             macgrid.v(i, 0, k) = 0.f;
             macgrid.v(i, 1, k) = 0.f;
@@ -204,9 +375,9 @@ void FlipSolver::enforceBoundaryConditions()
     }
 
     // Enforce for w velocity.
-    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    for (int i=0; i < macgrid.p.x_dim; ++i)
     {
-        for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+        for (int j=0; j < macgrid.p.y_dim; ++j)
         {
             macgrid.w(i, j, 0) = 0.f;
             macgrid.w(i, j, 1) = 0.f;
@@ -256,7 +427,7 @@ void FlipSolver::clearGrids()
     macgrid.u.clearVelocity();
     macgrid.v.clearVelocity();
     macgrid.w.clearVelocity();
-    macgrid.cellTypes.clear();
+    macgrid.marker.clear();
 }
 
 
@@ -272,6 +443,11 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
     int i = curr_idx[0];
     int j = curr_idx[1];
     int k = curr_idx[2];
+
+    if (macgrid.marker(i, j, k) == macgrid.marker.SOLID)
+    {
+        return;
+    }
 
     for (int n=-1; n < 2; ++n)
     {
@@ -302,7 +478,7 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
 
     // Mark cell type
     glm::vec3 type_idx = getGridIndex(p->pos);
-    macgrid.cellTypes(type_idx[0], type_idx[1], type_idx[2]) = macgrid.cellTypes.FLUID;
+    macgrid.marker(type_idx[0], type_idx[1], type_idx[2]) = macgrid.marker.FLUID;
 }
 
 

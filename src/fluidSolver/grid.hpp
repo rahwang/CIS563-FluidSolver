@@ -76,6 +76,11 @@ public:
         particleCount.at(i + x_dim * (j + y_dim * k))++;
     }
 
+    int flatIdx(int i, int j, int k)
+    {
+        return i + x_dim * (j + y_dim * k);
+    }
+
     void clearVelocity()
     {
         cells.clear();
@@ -152,8 +157,8 @@ public:
         v_old = Grid<float>(x, y+1, z);
         w_old = Grid<float>(x, y, z+1);
 
-        p_grid = Grid<float>(x, y, z);
-        cellTypes = Grid<int>(x, y, z);
+        p = Grid<float>(x, y, z);
+        marker = Grid<int>(x, y, z);
     }
 
     Grid<float> u;
@@ -164,8 +169,8 @@ public:
     Grid<float> v_old;
     Grid<float> w_old;
 
-    Grid<float> p_grid;
-    Grid<int> cellTypes;
+    Grid<float> p;
+    Grid<int> marker;
 };
 
 #endif /* grid_hpp */

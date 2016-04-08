@@ -45,11 +45,12 @@ public:
   void updateParticlePositions();
   void handleCollisions();
   void enforceBoundaryConditions();
+  void extrapolateVelocityComponent(const Grid<int>& tmp, Grid<float>& grid);
   void extrapolateVelocity();
   void storeDeltaVelocity(Grid<float> &old_grid, const Grid<float> &grid);
   void setSolidCells();
   void computePressure();
-
+  void assemblePressureSolveCoefficients(std::vector<T> &coefficients);
 
   MacGrid macgrid;
 };
