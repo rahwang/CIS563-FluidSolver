@@ -319,7 +319,7 @@ void FlipSolver::storeParticleVelocityToGrid()
         storeParticleVelocityToGridComponent(p, macgrid.v, 1);
         // Do w_grid update.
         storeParticleVelocityToGridComponent(p, macgrid.w, 2);
-    }
+    });
 #else
     for (Particle *p : particle_container->particles)
     {

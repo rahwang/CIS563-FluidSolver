@@ -37,6 +37,14 @@ find_package(OPENGL REQUIRED)
 find_package(GLEW)
 find_library(GLFW_LIBRARY "glfw3" HINTS ${GLFW_LIBRARY_DIR})
 find_library(JSONCPP "jsoncpp")
+find_library(TBB "tbb")
+
+
+# For open VDB
+find_library(OPENVDB "openvdb")
+find_library(LIBZ "z")
+find_library(HALF "half")
+
 
 add_definitions(
         -DTW_STATIC
@@ -46,7 +54,9 @@ add_definitions(
         -D_CRT_SECURE_NO_WARNINGS
 )
 
-set(CORE_LIBS ${GLFW_LIBRARY} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${JSONCPP} ${OPENGL_LIBRARY} )
+
+set(CORE_LIBS ${GLFW_LIBRARY} ${GLUT_LIBRARY} ${GLEW_LIBRARY} ${JSONCPP} ${OPENGL_LIBRARY} ${TBB} ${OPENVDB} ${LIBZ} ${HALF})
+
 
 # OSX-specific hacks/fixes
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -57,10 +67,12 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CORE_LIBS ${CORE_LIBS} ${COCOA} ${IOKIT} ${COREVIDEO})
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
+
 # Linux specific hacks/fixes
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lX11 -lXxf86vm -lXrandr -lpthread -lXi")
 endif()
+
 
 # set compiler flags for c++11
 if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" OR ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -69,16 +81,18 @@ elseif(WIN32)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
+
 if(MSVC)
-    set(COMPILER_FLAGS 
+    set(COMPILER_FLAGS
             CMAKE_CXX_FLAGS
             CMAKE_CXX_FLAGS_DEBUG
             CMAKE_CXX_FLAGS_RELEASE
-            CMAKE_C_FLAGS 
+            CMAKE_C_FLAGS
             CMAKE_C_FLAGS_DEBUG
             CMAKE_C_FLAGS_RELEASE
         )
 endif()
+
 
 # Add source files you want to compile (.cpp)
 set(CORE_SRC
@@ -94,6 +108,10 @@ set(CORE_SRC
         src/geom/particles.cpp
 )
 
+
 add_executable(Thanda ${CORE_SRC} src/viewer/SimpleVertexShader.vertexshader src/viewer/SimpleFragmentShader.fragmentshader)
 
+
 target_link_libraries(Thanda ${CORE_LIBS})
+
+
