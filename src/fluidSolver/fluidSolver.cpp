@@ -14,6 +14,7 @@
 
 //#define TBB 1
 
+
 void FlipSolver::step()
 {
     // Reset grid values.
@@ -33,50 +34,94 @@ void FlipSolver::step()
 }
 
 
-void FlipSolver::extrapolateVelocity() {
+void FlipSolver::computePressure()
+{
+    int n = macgrid.p_grid.getNumCells();
+    int m = n*n;
+
+    // To be passed to coefficient matrix.
+    std::vector<T> coefficients;
+
+    // b vector of divergences
+    Eigen::VectorXd b(n);
+
+    //buildProblem(coefficients, b, n);
+
+    // The coefficient matrix
+    SpMat A(m,m);
+    A.setFromTriplets(coefficients.begin(), coefficients.end());
+
+    // Solving for pressure
+    Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
+    Eigen::VectorXd x = chol.solve(b);         // use factorization to solve for the given right hand side
     for (int i=0; i < macgrid.p_grid.x_dim; ++i)
     {
         for (int j=0; j < macgrid.p_grid.y_dim; ++j)
         {
             for (int k=0; k < macgrid.p_grid.z_dim; ++k)
             {
-                if (macgrid.cellTypes(i, j, k) == macgrid.cellTypes.AIR)
+
+            }
+        }
+    }
+}
+
+
+void FlipSolver::setSolidCells()
+{
+    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    {
+        for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+        {
+            for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+            {
+                if (i == 0 || j == 0 || k == 0 ||
+                    i == macgrid.p_grid.x_dim-1 || j == macgrid.p_grid.y_dim -1 || k == macgrid.p_grid.z_dim-1)
                 {
-                    // X velocity grid check.
-                    if ((i-1 > 0 && macgrid.cellTypes(i-1, j, k) == macgrid.cellTypes.FLUID)
-                        && (i+1 > macgrid.p_grid.x_dim || macgrid.cellTypes(i+1, j, k) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.u(i, j, k) = macgrid.u(i-1, j, k);
-                    }
-                    else if ((i+1 <= macgrid.p_grid.x_dim && macgrid.cellTypes(i+1, j, k) == macgrid.cellTypes.FLUID)
-                             && (i-1 < 0 || macgrid.cellTypes(i-1, j, k) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.u(i, j, k) = macgrid.u(i+1, j, k);
-                    }
+                    macgrid.cellTypes(i, j, k) == macgrid.cellTypes.SOLID;
+                }
+            }
+        }
+    }
+}
 
-                    // Y velocity grid check.
-                    if ((j-1 > 0 && macgrid.cellTypes(i, j-1, k) == macgrid.cellTypes.FLUID)
-                        && (j+1 > macgrid.p_grid.y_dim || macgrid.cellTypes(i, j+1, k) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.v(i, j, k) = macgrid.v(i, j-1, k);
-                    }
-                    else if ((j+1 <= macgrid.p_grid.y_dim && macgrid.cellTypes(i, j+1, k) == macgrid.cellTypes.FLUID)
-                             && (j-1 < 0 || macgrid.cellTypes(i, j-1, k) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.v(i, j, k) = macgrid.v(i, j+1, k);
-                    }
 
-                    // X velocity grid check.
-                    if ((k-1 > 0 && macgrid.cellTypes(i, j, k-1) == macgrid.cellTypes.FLUID)
-                        && (k+1 > macgrid.p_grid.z_dim || macgrid.cellTypes(i, j, k+1) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.u(i, j, k) = macgrid.u(i, j, k-1);
-                    }
-                    else if ((k+1 <= macgrid.p_grid.z_dim && macgrid.cellTypes(i, j, k+1) == macgrid.cellTypes.FLUID)
-                             && (k-1 < 0 || macgrid.cellTypes(i, j, k-1) != macgrid.cellTypes.FLUID))
-                    {
-                        macgrid.u(i, j, k) = macgrid.u(i, j, k+1);
-                    }
+void FlipSolver::extrapolateVelocity()
+{
+    // Create temporary grids marking "near fluid" cells as fluid cells.
+    // These temporary grids will hold {FLUID | AIR} all AIR cells adjacent
+    // to FLUID cells in the temporary grids need extrapolation.
+    Grid<float> tmp_u(macgrid.u.x_dim, macgrid.u.y_dim, macgrid.u.z_dim);
+    Grid<float> tmp_v(macgrid.v.x_dim, macgrid.v.y_dim, macgrid.v.z_dim);
+    Grid<float> tmp_w(macgrid.w.x_dim, macgrid.w.y_dim, macgrid.w.z_dim);
+
+    tmp_u.clear();
+    tmp_v.clear();
+    tmp_w.clear();
+
+    for (int i=1; i < macgrid.p_grid.x_dim; ++i)
+    {
+        for (int j=1; j < macgrid.p_grid.y_dim; ++j)
+        {
+            for (int k=1; k < macgrid.p_grid.z_dim; ++k)
+            {
+                if (macgrid.cellTypes(i, j, k) == macgrid.cellTypes.FLUID)
+                {
+                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
+                    tmp_v(i, j, k) = macgrid.cellTypes.FLUID;
+                    tmp_w(i, j, k) = macgrid.cellTypes.FLUID;
+                }
+                else if (macgrid.cellTypes(i-1, j, k) == macgrid.cellTypes.FLUID)
+                {
+                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
+                }
+                else if (macgrid.cellTypes(i, j-1, k) == macgrid.cellTypes.FLUID)
+                {
+                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
+                }
+                else if (macgrid.cellTypes(i, j, k-1) == macgrid.cellTypes.FLUID)
+                {
+                    tmp_u(i, j, k) = macgrid.cellTypes.FLUID;
                 }
             }
         }
@@ -134,58 +179,43 @@ void FlipSolver::handleCollisions()
 
 void FlipSolver::enforceBoundaryConditions()
 {
-    // Iterate through all the grids.
+    // Enforce for u velocity.
+    for (int j=0; j < macgrid.p_grid.y_dim; ++j)
+    {
+        for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+        {
+            macgrid.u(0, j, k) = 0.f;
+            macgrid.u(1, j, k) = 0.f;
+            macgrid.u(macgrid.u.x_dim-2, j, k) = 0.f;
+            macgrid.u(macgrid.u.x_dim-1, j, k) = 0.f;
+        }
+    }
+
+    // Enforce for v velocity.
+    for (int i=0; i < macgrid.p_grid.x_dim; ++i)
+    {
+        for (int k=0; k < macgrid.p_grid.z_dim; ++k)
+        {
+            macgrid.v(i, 0, k) = 0.f;
+            macgrid.v(i, 1, k) = 0.f;
+            macgrid.v(i, macgrid.v.y_dim-2, k) = 0.f;
+            macgrid.v(i, macgrid.v.y_dim-1, k) = 0.f;
+        }
+    }
+
+    // Enforce for w velocity.
     for (int i=0; i < macgrid.p_grid.x_dim; ++i)
     {
         for (int j=0; j < macgrid.p_grid.y_dim; ++j)
         {
-            for (int k=0; k < macgrid.p_grid.z_dim; ++k)
-            {
-                // Check to see if the cell is solid.
-                if (macgrid.cellTypes(i, j, k) = macgrid.p_grid.SOLID)
-                {
-                    // For the min faces, zero velocity into cell.
-                    macgrid.u(i, j, k) = std::min(0.f, macgrid.u(i, j, k));
-                    macgrid.v(i, j, k) = std::min(0.f, macgrid.v(i, j, k));
-                    macgrid.w(i, j, k) = std::min(0.f, macgrid.w(i, j, k));
-
-                    for (int ii=i; ii < i+1; ++ii)
-                    {
-                        for (int jj=j; jj < j+1; ++jj)
-                        {
-                            for (int kk=k; kk < k+1; ++kk)
-                            {
-                                // For the max faces, zero velocity into cell.
-                                if (ii < macgrid.u.x_dim && jj < macgrid.u.y_dim && kk < macgrid.u.z_dim)
-                                    macgrid.u(ii, jj, kk) = std::max(0.f, macgrid.u(ii, jj, kk));
-                                if (ii < macgrid.v.x_dim && jj < macgrid.v.y_dim && kk < macgrid.v.z_dim)
-                                    macgrid.v(ii, jj, kk) = std::max(0.f, macgrid.v(ii, jj, kk));
-                                if (ii < macgrid.w.x_dim && jj < macgrid.w.y_dim && kk < macgrid.w.z_dim)
-                                    macgrid.w(ii, jj, kk) = std::max(0.f, macgrid.w(ii, jj, kk));
-                            }
-                        }
-                    }
-                }
-                
-                // For the min borders, zero velocity out of fluid bounds.
-                if (i == 0)
-                    macgrid.u(i, j, k) = std::max(0.f, macgrid.u(i, j, k));
-                if (j == 0)
-                    macgrid.v(i, j, k) = std::max(0.f, macgrid.v(i, j, k));
-                if (j == 0)
-                    macgrid.w(i, j, k) = std::max(0.f, macgrid.w(i, j, k));
-    
-                // For the max borders, zero velocity out of fluid bounds.
-                if (i == macgrid.p_grid.x_dim-1)
-                    macgrid.u(i+1, j, k) = std::min(0.f, macgrid.u(i+1, j, k));
-                if (j == macgrid.p_grid.y_dim-1)
-                    macgrid.v(i, j+1, k) = std::min(0.f, macgrid.v(i, j+1, k));
-                if (k == macgrid.p_grid.z_dim-1)
-                    macgrid.w(i, j, k+1) = std::min(0.f, macgrid.w(i, j, k+1));
-            }
+            macgrid.w(i, j, 0) = 0.f;
+            macgrid.w(i, j, 1) = 0.f;
+            macgrid.w(i, j, macgrid.w.z_dim-2) = 0.f;
+            macgrid.w(i, j, macgrid.w.z_dim-1) = 0.f;
         }
     }
 }
+
 
 
 // Using forward Euler for now.

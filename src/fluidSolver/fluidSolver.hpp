@@ -7,6 +7,11 @@
 
 #include "../geom/particles.hpp"
 #include "grid.hpp"
+#include <Eigen/Sparse>
+#include <vector>
+
+typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
+typedef Eigen::Triplet<double> T;
 
 class FluidSolver{
 public:
@@ -42,6 +47,9 @@ public:
   void enforceBoundaryConditions();
   void extrapolateVelocity();
   void storeDeltaVelocity(Grid<float> &old_grid, const Grid<float> &grid);
+  void setSolidCells();
+  void computePressure();
+
 
   MacGrid macgrid;
 };
