@@ -11,6 +11,7 @@
 #define RES 4
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
+#define DENSITY 1.f
 
 //#define TBB 1
 
@@ -24,6 +25,7 @@ void FlipSolver::step()
     // Zero velocities pointing into solid cells.
     enforceBoundaryConditions();
     applyGravity();
+    //computePressure();
     // TODO: Pressure step.
     enforceBoundaryConditions();
     // Handle air/fluid boundaries.
@@ -37,6 +39,7 @@ void FlipSolver::step()
 
 void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
 {
+    float scale = TIME_STEP / (DENSITY * CELL_WIDTH * CELL_WIDTH);
     // Index between 1 and dim-1 because we know the wells of our tank are solid.
     for (int i=1; i < macgrid.marker.x_dim-1; ++i)
     {
@@ -54,7 +57,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i+1, j, k),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         // LEFT
@@ -62,7 +65,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i-1, j, k),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         // UP
@@ -70,7 +73,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i, j+1, k),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         // DOWN
@@ -78,7 +81,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i, j-1, k),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         // FRONT
@@ -86,7 +89,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i, j, k+1),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         // BEHIND
@@ -94,12 +97,12 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
                         {
                             coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                    macgrid.marker.flatIdx(i, j, k-1),
-                                                   -1));
+                                                   -scale));
                             count++;
                         }
                         coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
                                                macgrid.marker.flatIdx(i, j, k),
-                                               count));
+                                               count * scale));
                     }
                 }
             }
@@ -115,8 +118,7 @@ void FlipSolver::computePressure()
     int m = n*n;
 
     // Build b vector of divergences
-    Eigen::VectorXd b(n);
-    int idx = 0;
+    Eigen::VectorXd b(m);
     for (int i=0; i < macgrid.p.x_dim; ++i)
     {
         for (int j=0; j < macgrid.p.y_dim; ++j)
@@ -126,7 +128,7 @@ void FlipSolver::computePressure()
                 float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
                 float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
                 float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
-                b[idx++] = u_div+v_div+w_div;
+                b[macgrid.p.flatIdx(i, j, k)] = -(u_div+v_div+w_div) / CELL_WIDTH;
             }
         }
     }
@@ -140,9 +142,26 @@ void FlipSolver::computePressure()
     A.setFromTriplets(coefficients.begin(), coefficients.end());
 
     // Solving for pressure
-    Eigen::SimplicialCholesky<SpMat> chol(A);  // performs a Cholesky factorization of A
-    Eigen::VectorXd x = chol.solve(b);         // use factorization to solve for the given right hand side
+    Eigen::ConjugateGradient<SpMat> chol(A);
+    Eigen::VectorXd pressures = chol.solve(b);         // use factorization to solve for the given right hand side
 
+    // Update velocities
+    float scale = (DENSITY * CELL_WIDTH) / TIME_STEP;
+    for (int i=1; i < macgrid.p.x_dim-1; ++i)
+    {
+        for (int j=1; j < macgrid.p.y_dim-1; ++j)
+        {
+            for (int k=1; k < macgrid.p.z_dim-1; ++k)
+            {
+                macgrid.u(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i+1, j, k)]
+                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
+                macgrid.v(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i, j+1, k)]
+                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
+                macgrid.w(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i, j, k+1)]
+                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
+            }
+        }
+    }
 }
 
 
