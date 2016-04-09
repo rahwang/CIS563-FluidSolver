@@ -60,6 +60,9 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
     // Use our shader
     glUseProgram(programID);
 
+    
+
+    Geometry * geom = objects[1];
     for (Geometry *geom : objects) {
         geom->create();
         // Model matrix : an identity matrix (model will be at the origin)
@@ -93,7 +96,7 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
                     );
 
         // Draw the triangle !
-        glPointSize(1);
+        glPointSize(3);
         glDrawArrays(geom->draw_type, 0, geom->num_indicies); // 12*3 indices starting at 0 -> 12 triangles
 
         glDisableVertexAttribArray(0);

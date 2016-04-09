@@ -8,7 +8,7 @@
 
 #define GRAVITY -9.8f
 #define TIME_STEP (1.0f/10.f)
-#define RES 4
+#define RES 2
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
 #define DENSITY 1.f
@@ -20,12 +20,13 @@ void FlipSolver::step()
 {
     // Reset grid values.
     clearGrids();
+    setSolidCells();
     // Transfer particle velocities to grid (Also marks cell types).
     storeParticleVelocityToGrid();
     // Zero velocities pointing into solid cells.
-    enforceBoundaryConditions();
     applyGravity();
-    //computePressure();
+    enforceBoundaryConditions();
+    computePressure();
     // TODO: Pressure step.
     enforceBoundaryConditions();
     // Handle air/fluid boundaries.
@@ -40,7 +41,7 @@ void FlipSolver::step()
 void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
 {
     float scale = TIME_STEP / (DENSITY * CELL_WIDTH * CELL_WIDTH);
-    // Index between 1 and dim-1 because we know the wells of our tank are solid.
+    // Index between 1 and dim-1 because we know the walls of our tank are solid.
     for (int i=1; i < macgrid.marker.x_dim-1; ++i)
     {
         for (int j=1; j < macgrid.marker.y_dim-1; ++j)
@@ -119,16 +120,23 @@ void FlipSolver::computePressure()
 
     // Build b vector of divergences
     Eigen::VectorXd b(m);
-    for (int i=0; i < macgrid.p.x_dim; ++i)
+    b.setZero();
+
+    for (int i=1; i < macgrid.p.x_dim-1; ++i)
     {
-        for (int j=0; j < macgrid.p.y_dim; ++j)
+        for (int j=1; j < macgrid.p.y_dim-1; ++j)
         {
-            for (int k=0; k < macgrid.p.z_dim; ++k)
+            for (int k=1; k < macgrid.p.z_dim-1; ++k)
             {
-                float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
-                float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
-                float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
-                b[macgrid.p.flatIdx(i, j, k)] = -(u_div+v_div+w_div) / CELL_WIDTH;
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
+                    float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
+                    float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
+                    b[macgrid.p.flatIdx(i, j, k)] = -(u_div+v_div+w_div) / CELL_WIDTH;
+                    float tmp = -(u_div+v_div+w_div) / CELL_WIDTH;
+                    std::cout << i << " " << j << " " << k << " " <<  tmp << std::endl;
+                }
             }
         }
     }
@@ -139,11 +147,12 @@ void FlipSolver::computePressure()
 
     // The coefficient matrix
     SpMat A(m,m);
+    A.setZero();
     A.setFromTriplets(coefficients.begin(), coefficients.end());
 
     // Solving for pressure
-    Eigen::ConjugateGradient<SpMat> chol(A);
-    Eigen::VectorXd pressures = chol.solve(b);         // use factorization to solve for the given right hand side
+    Eigen::ConjugateGradient<SpMat> con(A);
+    Eigen::VectorXd pressures = con.solve(b);         // use factorization to solve for the given right hand side
 
     // Update velocities
     float scale = (DENSITY * CELL_WIDTH) / TIME_STEP;
@@ -468,28 +477,28 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
         return;
     }
 
-    for (int n=-1; n < 2; ++n)
+    for (int n=0; n < 2; ++n)
     {
-        for (int m=-1; m < 2; ++m)
+        for (int m=0; m < 2; ++m)
         {
-            for (int o=-1; o < 2; ++o)
+            for (int o=0; o < 2; ++o)
             {
                 int I = i+n;
                 int J = j+m;
                 int K = k+o;
-                if (((I >= 0 && I < grid.x_dim)
-                        && (J >= 0 && J < grid.y_dim))
-                        && (K >= 0 && K < grid.z_dim))
+                if ((I < grid.x_dim) && (J < grid.y_dim) && (K < grid.z_dim))
                 {
                     // Calculate weight based on distance from cell center.
-                    float x = particle_container->min_x + ((I + 0.5f) * CELL_WIDTH);
-                    float y = particle_container->min_y + ((J + 0.5f) * CELL_WIDTH);
-                    float z = particle_container->min_z + ((K + 0.5f) * CELL_WIDTH);
-                    float weight = 1.0f / glm::length(glm::vec3(x, y, z)-p->pos);
+                    glm::vec3 face_pos(particle_container->min_x + I * CELL_WIDTH,
+                                      particle_container->min_y + J * CELL_WIDTH,
+                                      particle_container->min_z + K * CELL_WIDTH);
+                    face_pos[(dim + 1) % 3] += 0.5f * CELL_WIDTH;
+                    face_pos[(dim + 2) % 3] += 0.5f * CELL_WIDTH;
+                    float weight = 1.f / glm::length(face_pos-p->pos);
                     
                     // Store velocity contribution and increment particle counter.
                     grid(I, J, K) += weight * p->velocity[dim];
-                    grid.incrementParticleCount(I, J, K);
+                    grid.incrementTotalWeight(I, J, K, weight);
                 }
             }
         }
@@ -556,9 +565,9 @@ glm::vec3 FlipSolver::getGridIndex(const glm::vec3 &pos)
     int k = int(floor((pos[2] - particle_container->min_z) / CELL_WIDTH));
 
     // Clamp values.
-    i = std::min(std::max(i, 0), int(particle_container->x_dim-1));
-    j = std::min(std::max(j, 0), int(particle_container->y_dim-1));
-    k = std::min(std::max(k, 0), int(particle_container->z_dim-1));
+    i = std::min(std::max(i, 0), int(particle_container->x_dim * RES -1));
+    j = std::min(std::max(j, 0), int(particle_container->y_dim * RES -1));
+    k = std::min(std::max(k, 0), int(particle_container->z_dim * RES -1));
 
     return glm::vec3(i, j, k);
 }
@@ -648,13 +657,18 @@ void FlipSolver::gridVelocityToParticle()
         float pic_z = interpolateVelocityComponent(p, macgrid.w, 2);
         
         // Get FLIP components. "old" grids currently contain delta velocity.
-        float flip_x = p->velocity[0] + interpolateVelocityComponent(p, macgrid.u_old, 0);
-        float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
-        float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
+//        float flip_x = p->velocity[0] + interpolateVelocityComponent(p, macgrid.u_old, 0);
+//        float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
+//        float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
         
-        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
-        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
-        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
+//        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
+//        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
+//        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
+        
+        p->velocity[0] = pic_x;
+        p->velocity[1] = pic_y;
+        p->velocity[2] = pic_z;
+
 
         //std::cout << p->velocity[1] << std::endl;
     }

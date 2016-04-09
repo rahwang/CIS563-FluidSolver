@@ -19,7 +19,7 @@ private:
     // The velocity or pressure quantities stored on the grid.
     std::vector<T> cells;
     // The number of particles influencing this quanitity.
-    std::vector<int> particleCount;
+    std::vector<float> totalWeight;
 public:
     int x_dim;
     int y_dim;
@@ -29,7 +29,7 @@ public:
     Grid() {}
     Grid(int x, int y, int z) : x_dim(x), y_dim(y), z_dim(z) {
         cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
-        particleCount = std::vector<int>(x_dim*y_dim*z_dim, 0);
+        totalWeight = std::vector<float>(x_dim*y_dim*z_dim, 0.f);
         maxIndex = x_dim*y_dim*z_dim;
     }
     ~Grid() {}
@@ -66,14 +66,14 @@ public:
     {
         assert(i >= 0 && j >= 0 && k >= 0);
         assert(i < x_dim && j < y_dim && k < z_dim);
-        return particleCount.at(i + x_dim * (j + y_dim * k));
+        return totalWeight.at(i + x_dim * (j + y_dim * k));
     }
 
-    void incrementParticleCount(int i, int j, int k)
+    void incrementTotalWeight(int i, int j, int k, float val)
     {
         assert(i >= 0 && j >= 0 && k >= 0);
         assert(i < x_dim && j < y_dim && k < z_dim);
-        particleCount.at(i + x_dim * (j + y_dim * k))++;
+        totalWeight.at(i + x_dim * (j + y_dim * k)) += val;
     }
 
     int flatIdx(int i, int j, int k)
@@ -84,9 +84,9 @@ public:
     void clearVelocity()
     {
         cells.clear();
-        particleCount.clear();
+        totalWeight.clear();
         cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
-        particleCount = std::vector<int>(x_dim*y_dim*z_dim, 0);
+        totalWeight = std::vector<float>(x_dim*y_dim*z_dim, 0.f);
     }
     
     void copyCells(Grid &dst_grid)
@@ -131,7 +131,7 @@ public:
         int numCells = cells.size();
         for (int i=0; i < numCells; ++i)
         {
-            cells[i] /= MATHIF(particleCount[i] > 0, particleCount[i], 1.0f);
+            cells[i] /= MATHIF(totalWeight[i] > 0, totalWeight[i], 1.0f);
         }
 #endif
     }
