@@ -38,7 +38,7 @@ void FlipSolver::step()
 }
 
 
-void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
+void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficients)
 {
     float scale = TIME_STEP / (DENSITY * CELL_WIDTH * CELL_WIDTH);
     // Index between 1 and dim-1 because we know the walls of our tank are solid.
@@ -48,63 +48,78 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
         {
             for (int k=1; k < macgrid.marker.z_dim-1; ++k)
             {
-                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
-                {
-                    // This is a count of the EMPTY | FLUID neighboring cells.
-                    if (macgrid.marker(i, j, k) == macgrid.marker.FLUID) {
-                        int count = 0;
-                        // RIGHT
-                        if (macgrid.marker(i+1, j, k) != macgrid.marker.SOLID)
+                // This is a count of the EMPTY | FLUID neighboring cells.
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID) {
+                    int count = 0;
+                    int curr_idx = macgrid.marker.flatIdx(i, j, k);
+                    
+                    // RIGHT
+                    if (macgrid.marker(i+1, j, k) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i+1, j, k) == macgrid.marker.FLUID)
                         {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                        coefficients.push_back(Tri(curr_idx,
                                                    macgrid.marker.flatIdx(i+1, j, k),
                                                    -scale));
-                            count++;
                         }
-                        // LEFT
-                        if (macgrid.marker(i-1, j, k) != macgrid.marker.SOLID)
+                    }
+                    // LEFT
+                    if (macgrid.marker(i-1, j, k) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i-1, j, k) == macgrid.marker.FLUID)
                         {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                        coefficients.push_back(Tri(curr_idx,
                                                    macgrid.marker.flatIdx(i-1, j, k),
                                                    -scale));
-                            count++;
                         }
-                        // UP
-                        if (macgrid.marker(i, j+1, k) != macgrid.marker.SOLID)
+                    }
+                    // UP
+                    if (macgrid.marker(i, j+1, k) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i, j+1, k) == macgrid.marker.FLUID)
                         {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                        coefficients.push_back(Tri(curr_idx,
                                                    macgrid.marker.flatIdx(i, j+1, k),
                                                    -scale));
-                            count++;
                         }
-                        // DOWN
-                        if (macgrid.marker(i, j-1, k) != macgrid.marker.SOLID)
+                    }
+                    // DOWN
+                    if (macgrid.marker(i, j-1, k) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i, j-1, k) == macgrid.marker.FLUID)
                         {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
+                        coefficients.push_back(Tri(curr_idx,
                                                    macgrid.marker.flatIdx(i, j-1, k),
                                                    -scale));
-                            count++;
                         }
-                        // FRONT
-                        if (macgrid.marker(i, j, k+1) != macgrid.marker.SOLID)
-                        {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
-                                                   macgrid.marker.flatIdx(i, j, k+1),
-                                                   -scale));
-                            count++;
-                        }
-                        // BEHIND
-                        if (macgrid.marker(i, j, k-1) != macgrid.marker.SOLID)
-                        {
-                            coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
-                                                   macgrid.marker.flatIdx(i, j, k-1),
-                                                   -scale));
-                            count++;
-                        }
-                        coefficients.push_back(T(macgrid.marker.flatIdx(i, j, k),
-                                               macgrid.marker.flatIdx(i, j, k),
-                                               count * scale));
                     }
+                    // FRONT
+                    if (macgrid.marker(i, j, k+1) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i, j, k+1) == macgrid.marker.FLUID)
+                        {
+                            coefficients.push_back(Tri(curr_idx,
+                                                       macgrid.marker.flatIdx(i, j, k+1),
+                                                       -scale));
+                        }
+                    }
+                    // BEHIND
+                    if (macgrid.marker(i, j, k-1) != macgrid.marker.SOLID)
+                    {
+                        count++;
+                        if (macgrid.marker(i, j, k-1) == macgrid.marker.FLUID)
+                        {
+                            coefficients.push_back(Tri(curr_idx,
+                                                       macgrid.marker.flatIdx(i, j, k-1),
+                                                       -scale));
+                        }
+                    }
+                    coefficients.push_back(Tri(curr_idx, curr_idx, count * scale));
                 }
             }
         }
@@ -116,12 +131,15 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<T> &coefficients)
 void FlipSolver::computePressure()
 {
     int n = macgrid.p.getNumCells();
-    int m = n*n;
 
-    // Build b vector of divergences
-    Eigen::VectorXd b(m);
+    SpMat A(n,n);
+    Eigen::VectorXd p(n);
+    Eigen::VectorXd b(n);
+    A.setZero();
+    p.setZero();
     b.setZero();
-
+    
+    // Build b vector of divergences
     for (int i=1; i < macgrid.p.x_dim-1; ++i)
     {
         for (int j=1; j < macgrid.p.y_dim-1; ++j)
@@ -133,44 +151,83 @@ void FlipSolver::computePressure()
                     float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
                     float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
                     float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
-                    b[macgrid.p.flatIdx(i, j, k)] = -(u_div+v_div+w_div) / CELL_WIDTH;
-                    float tmp = -(u_div+v_div+w_div) / CELL_WIDTH;
-                    std::cout << i << " " << j << " " << k << " " <<  tmp << std::endl;
+                    b[macgrid.p.flatIdx(i, j, k)] = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
+                    float tmp = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
                 }
             }
         }
     }
 
     // Assemble coeff vector to be passed to coefficient matrix.
-    std::vector<T> coefficients;
+    std::vector<Tri> coefficients;
     assemblePressureSolveCoefficients(coefficients);
 
-    // The coefficient matrix
-    SpMat A(m,m);
-    A.setZero();
+    // Set the coefficient matrix
     A.setFromTriplets(coefficients.begin(), coefficients.end());
-
+    
     // Solving for pressure
-    Eigen::ConjugateGradient<SpMat> con(A);
-    Eigen::VectorXd pressures = con.solve(b);         // use factorization to solve for the given right hand side
+    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> con;
+    con.compute(A);
+    p = con.solve(b);         // use factorization to solve for the given right hand side
+    
+    std::cout << "Divergece" << std::endl;
+    std::cout << b << std::endl;
+    
+    std::cout << "Coefficients" << std::endl;
+    std::cout << A << std::endl;
+
+    std::cout << "Pressure" << std::endl;
+    std::cout << p << std::endl;
 
     // Update velocities
-    float scale = (DENSITY * CELL_WIDTH) / TIME_STEP;
+    float scale = TIME_STEP / (DENSITY * CELL_WIDTH);
+    for (int i=1; i < macgrid.p.x_dim; ++i)
+    {
+        for (int j=1; j < macgrid.p.y_dim; ++j)
+        {
+            for (int k=1; k < macgrid.p.z_dim; ++k)
+            {
+                if (macgrid.marker(i-1, j, k) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    macgrid.u(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                                   - p[macgrid.p.flatIdx(i-1, j, k)]);
+                }
+                if (macgrid.marker(i, j-1, k) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                macgrid.v(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                               - p[macgrid.p.flatIdx(i, j-1, k)]);
+                }
+                if (macgrid.marker(i, j, k-1) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                macgrid.w(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                               - p[macgrid.p.flatIdx(i, j, k-1)]);
+                }
+            }
+        }
+    }
+    
+    // Check resulting divergences.
     for (int i=1; i < macgrid.p.x_dim-1; ++i)
     {
         for (int j=1; j < macgrid.p.y_dim-1; ++j)
         {
             for (int k=1; k < macgrid.p.z_dim-1; ++k)
             {
-                macgrid.u(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i+1, j, k)]
-                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
-                macgrid.v(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i, j+1, k)]
-                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
-                macgrid.w(i, j, k) -= scale * (pressures[macgrid.p.flatIdx(i, j, k+1)]
-                                               - pressures[macgrid.p.flatIdx(i, j, k)]);
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                {
+                    float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
+                    float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
+                    float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
+                    b[macgrid.p.flatIdx(i, j, k)] = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
+                    float tmp = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
+                }
             }
         }
     }
+
+    std::cout << "Divergece" << std::endl;
+    std::cout << b << std::endl;
+
 }
 
 
