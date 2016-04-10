@@ -54,6 +54,7 @@ public:
   void setSolidCells();
   void computePressure();
   void assemblePressureSolveCoefficients(std::vector<Tri> &coefficients);
+  void checkTypes();
 
   MacGrid macgrid;
 };

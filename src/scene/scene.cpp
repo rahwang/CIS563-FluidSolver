@@ -102,7 +102,7 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
         glDisableVertexAttribArray(0);
         glDisableVertexAttribArray(1);
     }
-
+    
     // Update particle positions
     fluid_solver.step();
 }

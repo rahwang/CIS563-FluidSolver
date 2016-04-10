@@ -7,14 +7,15 @@
 #include <tbb/tbb.h>
 
 #define GRAVITY -9.8f
-#define TIME_STEP (1.0f/20.f)
-#define RES 2
+#define TIME_STEP (1.0f/50.f)
+#define RES 4
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
 #define DENSITY 1.f
 
 //#define TBB 1
 
+int iter = 0;
 
 void FlipSolver::step()
 {
@@ -35,8 +36,28 @@ void FlipSolver::step()
     gridVelocityToParticle();
     updateParticlePositions();
     handleCollisions();
+    iter++;
+    if (iter > 100)
+    {
+        std::cout << "iteration: " << iter << std::endl;
+        checkTypes();
+    }
 }
 
+void FlipSolver::checkTypes()
+{
+    for (int i=0; i < macgrid.marker.x_dim; ++i)
+    {
+        for (int j=0; j < macgrid.marker.y_dim; ++j)
+        {
+            for (int k=0; k < macgrid.marker.z_dim; ++k)
+            {
+                if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
+                    std::cout << i << " " << j << " " << k << std::endl;
+            }
+        }
+    }
+}
 
 void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficients)
 {
@@ -53,12 +74,20 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     int count = 0;
                     int curr_idx = macgrid.marker.flatIdx(i, j, k);
                     
+                    int right_mark = macgrid.marker(i+1, j, k);
+                    int left_mark = macgrid.marker(i-1, j, k);
+                    int up_mark = macgrid.marker(i, j+1, k);
+                    int down_mark = macgrid.marker(i, j-1, k);
+                    int front_mark = macgrid.marker(i, j, k+1);
+                    int behind_mark = macgrid.marker(i, j, k-1);
+
+                    
                     // RIGHT
-                    if (macgrid.marker(i+1, j, k) == macgrid.marker.AIR)
+                    if (right_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i+1, j, k) == macgrid.marker.FLUID)
+                    else if (right_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -67,11 +96,11 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     }
                     
                     // LEFT
-                    if (macgrid.marker(i-1, j, k) == macgrid.marker.AIR)
+                    if (left_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i-1, j, k) == macgrid.marker.FLUID)
+                    else if (left_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -80,11 +109,11 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     }
                     
                     // UP
-                    if (macgrid.marker(i, j+1, k) == macgrid.marker.AIR)
+                    if (up_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i, j+1, k) == macgrid.marker.FLUID)
+                    else if (up_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -93,11 +122,11 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     }
                     
                     // DOWN
-                    if (macgrid.marker(i, j-1, k) == macgrid.marker.AIR)
+                    if (down_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i, j-1, k) == macgrid.marker.FLUID)
+                    else if (down_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -106,11 +135,11 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     }
                     
                     // FRONT
-                    if (macgrid.marker(i, j, k+1) == macgrid.marker.AIR)
+                    if (front_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i, j, k+1) == macgrid.marker.FLUID)
+                    else if (front_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -119,11 +148,11 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     }
                     
                     // BEHIND
-                    if (macgrid.marker(i, j, k-1) == macgrid.marker.AIR)
+                    if (behind_mark == macgrid.marker.AIR)
                     {
                         count++;
                     }
-                    else if (macgrid.marker(i, j, k-1) == macgrid.marker.FLUID)
+                    else if (behind_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -151,6 +180,7 @@ void FlipSolver::computePressure()
     b.setZero();
     
     // Build b vector of divergences
+    float scale = 1.f / CELL_WIDTH;
     for (int i=1; i < macgrid.p.x_dim-1; ++i)
     {
         for (int j=1; j < macgrid.p.y_dim-1; ++j)
@@ -162,8 +192,7 @@ void FlipSolver::computePressure()
                     float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
                     float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
                     float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
-                    b[macgrid.p.flatIdx(i, j, k)] = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
-                    float tmp = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
+                    b[macgrid.p.flatIdx(i, j, k)] = -scale * (u_div+v_div+w_div);
                 }
             }
         }
@@ -183,41 +212,64 @@ void FlipSolver::computePressure()
     
 //    std::cout << "Divergece" << std::endl;
 //    std::cout << b << std::endl;
-//    
-//    std::cout << "Coefficients" << std::endl;
-//    std::cout << A << std::endl;
+//
 //
 //    std::cout << "Pressure" << std::endl;
 //    std::cout << p << std::endl;
 
     // Update velocities
-    float scale = TIME_STEP / (DENSITY * CELL_WIDTH);
+    scale = TIME_STEP / (DENSITY * CELL_WIDTH);
     for (int i=1; i < macgrid.p.x_dim; ++i)
     {
         for (int j=1; j < macgrid.p.y_dim; ++j)
         {
             for (int k=1; k < macgrid.p.z_dim; ++k)
             {
+                // Update u
                 if (macgrid.marker(i-1, j, k) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                 {
-                    macgrid.u(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-                                                   - p[macgrid.p.flatIdx(i-1, j, k)]);
+                    if (macgrid.marker(i-1, j, k) == macgrid.marker.SOLID || macgrid.marker(i, j, k) == macgrid.marker.SOLID)
+                    {
+                        macgrid.u(i, j, k) = 0.f;
+                    }
+                    else
+                    {
+                        macgrid.u(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                                       - p[macgrid.p.flatIdx(i-1, j, k)]);
+                    }
                 }
+                
+                // Update v
                 if (macgrid.marker(i, j-1, k) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                 {
-                macgrid.v(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-                                               - p[macgrid.p.flatIdx(i, j-1, k)]);
+                    if (macgrid.marker(i, j-1, k) == macgrid.marker.SOLID || macgrid.marker(i, j, k) == macgrid.marker.SOLID)
+                    {
+                        macgrid.v(i, j, k) = 0.f;
+                    }
+                    else
+                    {
+                        macgrid.v(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                                       - p[macgrid.p.flatIdx(i, j-1, k)]);
+                    }
                 }
+                
+                // Update w
                 if (macgrid.marker(i, j, k-1) == macgrid.marker.FLUID || macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                 {
-                macgrid.w(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-                                               - p[macgrid.p.flatIdx(i, j, k-1)]);
+                    if (macgrid.marker(i, j, k-1) == macgrid.marker.SOLID || macgrid.marker(i, j, k) == macgrid.marker.SOLID)
+                    {
+                        macgrid.w(i, j, k) = 0.f;
+                    }
+                    else
+                    {
+                        macgrid.w(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
+                                                       - p[macgrid.p.flatIdx(i, j, k-1)]);
+                    }
                 }
             }
         }
     }
     
-    float div = 0.f;
     // Check resulting divergences.
     for (int i=1; i < macgrid.p.x_dim-1; ++i)
     {
@@ -227,23 +279,24 @@ void FlipSolver::computePressure()
             {
                 if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                 {
+                    float div = 0.f;
                     float u_div = macgrid.u(i+1, j, k) - macgrid.u(i, j, k);
                     float v_div = macgrid.v(i, j+1, k) - macgrid.v(i, j, k);
                     float w_div = macgrid.w(i, j, k+1) - macgrid.w(i, j, k);
                     b[macgrid.p.flatIdx(i, j, k)] = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
                     float tmp = -1 * (u_div+v_div+w_div) / CELL_WIDTH;
                     div += tmp;
+                    if (abs(div) > 0.1)
+                    {
+                        std::cout << "LIES DIVERGENCE IS HERE : " << i << " "<< j<< " "<<k << " : "<< div<<std::endl;
+                        std::cout << "Coefficients" << std::endl;
+                        std::cout << A << std::endl;
+                    }
                 }
             }
         }
     }
-
-    //std::cout << "Divergece" << std::endl;
-    //std::cout << b << std::endl;
-    if (abs(div) > 0.1)
-    {
-        std::cout << "LIES DIVERGENCE IS HERE : " << div << std::endl;
-    }
+    int a =1;
 
 }
 
@@ -408,42 +461,44 @@ void FlipSolver::handleCollisions()
     int size = particle_container->particles.size();
     tbb::parallel_for(0, size, 1, [=](int i)
     {
+        float OFFSET_CELL_WIDTH = CELL_WIDTH + .01;
         Particle *p = particle_container->particles[i];
         // Check to see if p is inside bounding volume
-        if (p->pos[0] < particle_container->min_x || p->pos[0] > particle_container->max_x)
+        if (p->pos[0] < (particle_container->min_x + CELL_WIDTH)
+            || p->pos[0] > (particle_container->max_x - CELL_WIDTH))
         {
-            p->pos[0] = std::min(std::max(p->pos[0], particle_container->min_x), particle_container->max_x);
-            p->velocity[0] *= -DAMPING;
+            p->pos[0] = std::min(std::max(p->pos[0], particle_container->min_x + OFFSET_CELL_WIDTH), particle_container->max_x - OFFSET_CELL_WIDTH);
         }
-        if (p->pos[1] < particle_container->min_y || p->pos[1] > particle_container->max_y)
+        if (p->pos[1] < (particle_container->min_y + CELL_WIDTH)
+            || p->pos[1] > (particle_container->max_y - CELL_WIDTH))
         {
-            p->pos[1] = std::min(std::max(p->pos[1], particle_container->min_y), particle_container->max_y);
-            p->velocity[1] *= -DAMPING;
+            p->pos[1] = std::min(std::max(p->pos[1], particle_container->min_y + OFFSET_CELL_WIDTH), particle_container->max_y - OFFSET_CELL_WIDTH);
         }
-        if (p->pos[2] < particle_container->min_z || p->pos[2] > particle_container->max_z)
+        if (p->pos[2] < (particle_container->min_z + CELL_WIDTH)
+            || p->pos[2] > (particle_container->max_z - CELL_WIDTH))
         {
-            p->pos[2] = std::min(std::max(p->pos[2], particle_container->min_z), particle_container->max_z);
-            p->velocity[2] *= -DAMPING;
+            p->pos[2] = std::min(std::max(p->pos[2], particle_container->min_z + OFFSET_CELL_WIDTH), particle_container->max_z - OFFSET_CELL_WIDTH);
         }
     });
 #else
     for (Particle *p : particle_container->particles)
     {
+        float OFFSET_CELL_WIDTH = CELL_WIDTH + .01;
         // Check to see if p is inside bounding volume
-        if (p->pos[0] < particle_container->min_x || p->pos[0] > particle_container->max_x)
+        if (p->pos[0] < (particle_container->min_x + CELL_WIDTH)
+            || p->pos[0] > (particle_container->max_x - CELL_WIDTH))
         {
-            p->pos[0] = std::min(std::max(p->pos[0], particle_container->min_x), particle_container->max_x);
-            p->velocity[0] *= -DAMPING;
+            p->pos[0] = std::min(std::max(p->pos[0], particle_container->min_x + OFFSET_CELL_WIDTH), particle_container->max_x - OFFSET_CELL_WIDTH);
         }
-        if (p->pos[1] < particle_container->min_y || p->pos[1] > particle_container->max_y)
+        if (p->pos[1] < (particle_container->min_y + CELL_WIDTH)
+            || p->pos[1] > (particle_container->max_y - CELL_WIDTH))
         {
-            p->pos[1] = std::min(std::max(p->pos[1], particle_container->min_y), particle_container->max_y);
-            p->velocity[1] *= -DAMPING;
+            p->pos[1] = std::min(std::max(p->pos[1], particle_container->min_y + OFFSET_CELL_WIDTH), particle_container->max_y - OFFSET_CELL_WIDTH);
         }
-        if (p->pos[2] < particle_container->min_z || p->pos[2] > particle_container->max_z)
+        if (p->pos[2] < (particle_container->min_z + CELL_WIDTH)
+            || p->pos[2] > (particle_container->max_z - CELL_WIDTH))
         {
-            p->pos[2] = std::min(std::max(p->pos[2], particle_container->min_z), particle_container->max_z);
-            p->velocity[2] *= -DAMPING;
+            p->pos[2] = std::min(std::max(p->pos[2], particle_container->min_z + OFFSET_CELL_WIDTH), particle_container->max_z - OFFSET_CELL_WIDTH);
         }
     }
 #endif
