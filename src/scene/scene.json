@@ -1,13 +1,13 @@
 {
 	"containerDim" : {
-		"scaleX" : 2.0,
-		"scaleY" : 2.0,
-		"scaleZ" : 2.0
+		"scaleX" : 4.0,
+		"scaleY" : 4.0,
+		"scaleZ" : 4.0
 	},
 	"particleDim" : {
-		"boundX" : 0.5,
-		"boundY" : 0.5,
-		"boundZ" : 0.5
+		"boundX" : 3.0,
+		"boundY" : 3.0,
+		"boundZ" : 3.0
 	},
-	"particleSeparation" : 0.2
+	"particleSeparation" : 0.1
 }
