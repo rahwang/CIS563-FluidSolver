@@ -14,15 +14,15 @@
 #include <vector>
 
 typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
-typedef Eigen::Triplet<double> Tri;
+typedef Eigen::Triplet<float> Tri;
 
 class FluidSolver{
 public:
   FluidSolver() {}
-  FluidSolver(ParticleContainer *particles) : particle_container(particles) {}
+  FluidSolver(ParticleContainer *particles) : box(particles) {}
   virtual void init() = 0;
 
-  ParticleContainer *particle_container = NULL;
+  ParticleContainer *box = NULL;
 };
 
 class FlipSolver : public FluidSolver {

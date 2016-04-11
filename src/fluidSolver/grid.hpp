@@ -96,7 +96,7 @@ public:
 
     void clear()
     {
-        cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
+        cells = std::vector<T>(x_dim*y_dim*z_dim, 0);
     }
 
     void printGrid()

@@ -60,9 +60,6 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
     // Use our shader
     glUseProgram(programID);
 
-    
-
-    Geometry * geom = objects[1];
     for (Geometry *geom : objects) {
         geom->create();
         // Model matrix : an identity matrix (model will be at the origin)

@@ -12,11 +12,12 @@
 class Particle
 {
 public:
-    Particle(const glm::vec3 &pos, const glm::vec3 &vel) : pos(pos), velocity(vel) {}
+    Particle(const glm::vec3 &pos, const glm::vec3 &vel) : pos(pos), velocity(vel), color(0.f) {}
     ~Particle();
 
     glm::vec3 pos;
     glm::vec3 velocity;
+    glm::vec3 color;
     int dead;
 };
 
@@ -43,6 +44,14 @@ public:
     float max_x;
     float max_y;
     float max_z;
+    
+    float init_min_x;
+    float init_min_y;
+    float init_min_z;
+    float init_max_x;
+    float init_max_y;
+    float init_max_z;
+    
     float x_dim;
     float y_dim;
     float z_dim;

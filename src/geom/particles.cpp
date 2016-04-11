@@ -18,8 +18,14 @@ void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &
     x_dim = max_x - min_x;
     y_dim = max_y - min_y;
     z_dim = max_z - min_z;
+    
+    init_min_x = -bounds[0];
+    init_min_y = -bounds[1];
+    init_min_z = -bounds[2];
+    init_max_x = bounds[0];
+    init_max_y = bounds[1];
+    init_max_z = bounds[2];
 
-    // Divide by two to center around the origin.
     glm::vec3 centered_bounds = bounds / 2.f;
     for (float i=-centered_bounds[0]; i < centered_bounds[0]; i += separation) {
         for (float j=-centered_bounds[1]; j < centered_bounds[1]; j += separation) {
@@ -31,7 +37,7 @@ void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &
             }
         }
     }
-
+    
     num_indicies = particles.size();
     //std::cout << "SIZE" << num_indicies << std::endl;
 }
@@ -57,9 +63,9 @@ void ParticleContainer::create() {
         g_vertex_buffer_data.push_back(p->pos[1]);
         g_vertex_buffer_data.push_back(p->pos[2]);
 
-        g_color_buffer_data.push_back(0.0f);
-        g_color_buffer_data.push_back(0.0f);
-        g_color_buffer_data.push_back(0.5f);
+        g_color_buffer_data.push_back(p->color[0]);
+        g_color_buffer_data.push_back(p->color[1]);
+        g_color_buffer_data.push_back(p->color[2]);
     }
 
     glGenBuffers(1, &vertexbuffer);
