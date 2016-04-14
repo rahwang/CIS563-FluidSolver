@@ -13,8 +13,8 @@
 #include <Eigen/IterativeLinearSolvers>
 
 #define GRAVITY -9.8f
-#define TIME_STEP (1.0f/10.f)
-#define RES 1
+#define TIME_STEP (1.0f/100.f)
+#define RES 4
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
 #define DENSITY 1.f
@@ -32,6 +32,8 @@ void FlipSolver::step()
     setSolidCells();
     // Transfer particle velocities to grid (Also marks cell types).
     storeParticleVelocityToGrid();
+    
+    // Copy old velocity
     macgrid.u.copyCells(macgrid.u_old);
     macgrid.v.copyCells(macgrid.v_old);
     macgrid.w.copyCells(macgrid.w_old);
@@ -48,19 +50,13 @@ void FlipSolver::step()
     gridVelocityToParticle();
     updateParticlePositions();
     handleCollisions();
-    iter++;
-//    if (iter == 45)
-//    {
-//        std::cout << "iteration: " << iter << std::endl;
-//    std::cout << "ITER: " << iter << std::endl;
-    //checkTypes();
-//    }
 #ifdef DEBUG
-//    if (iter == 44) {
-//        int a = 1;
-//    }
+    iter++;
+    std::cout << "ITER: " << iter << std::endl;
+    checkTypes();
 #endif
 }
+
 
 void FlipSolver::checkTypes()
 {
@@ -71,18 +67,13 @@ void FlipSolver::checkTypes()
         {
             for (int k=0; k < macgrid.marker.z_dim; ++k)
             {
-#ifdef DEBUG
-                if (!macgrid.v(i,j,k))  {
-                    count +=1;
-                }
                 if (macgrid.marker(i, j, k) == macgrid.marker.FLUID)
                     std::cout << i << " " << j << " " << k << std::endl;
-#endif
             }
         }
     }
-    std::cout<<"#ZERO V"<<count<<std::endl;
 }
+
 
 void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficients)
 {
@@ -98,10 +89,6 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                 if (macgrid.marker(i, j, k) == macgrid.marker.FLUID) {
                     int count = 0;
                     int curr_idx = macgrid.marker.flatIdx(i, j, k);
-                    
-                    if (curr_idx == 1558) {
-                        int a = 1;
-                    }
                     
                     int right_mark = macgrid.marker(i+1, j, k);
                     int left_mark = macgrid.marker(i-1, j, k);
@@ -240,13 +227,6 @@ void FlipSolver::computePressure()
     Eigen::ConjugateGradient<Eigen::SparseMatrix<double>, Eigen::Lower|Eigen::Lower> con(A);
     p = con.solve(b);         // use factorization to solve for the given right hand side
     
-//    std::cout << "Divergece" << std::endl;
-//    std::cout << b << std::endl;
-//
-//
-//    std::cout << "Pressure" << std::endl;
-//    std::cout << p << std::endl;
-
     // Update velocities
     scale = TIME_STEP / (DENSITY * CELL_WIDTH);
     for (int i=1; i < macgrid.p.x_dim; ++i)
@@ -269,9 +249,6 @@ void FlipSolver::computePressure()
                         macgrid.u(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
                                                        - p[macgrid.p.flatIdx(i-1, j, k)]);
                     }
-//                    macgrid.u(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-//                                                   - p[macgrid.p.flatIdx(i-1, j, k)]);
-
                 }
                 
                 // Update v
@@ -288,9 +265,6 @@ void FlipSolver::computePressure()
                         macgrid.v(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
                                                        - p[macgrid.p.flatIdx(i, j-1, k)]);
                     }
-//                    macgrid.v(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-//                                                   - p[macgrid.p.flatIdx(i, j-1, k)]);
-
                 }
                 
                 // Update w
@@ -307,9 +281,6 @@ void FlipSolver::computePressure()
                         macgrid.w(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
                                                        - p[macgrid.p.flatIdx(i, j, k-1)]);
                     }
-//                    macgrid.w(i, j, k) -= scale * (p[macgrid.p.flatIdx(i, j, k)]
-//                                                   - p[macgrid.p.flatIdx(i, j, k-1)]);
-
                 }
             }
         }
@@ -320,7 +291,7 @@ void FlipSolver::computePressure()
     for (Particle *pt : box->particles)
     {
         glm::vec3 idx = getGridIndex(pt->pos);
-        pt->color[2] = p[macgrid.p.flatIdx(idx[0], idx[1], idx[2])] - 1.f;
+        pt->color[2] = 1.f - p[macgrid.p.flatIdx(idx[0], idx[1], idx[2])];
     }
     
     
@@ -492,7 +463,6 @@ void FlipSolver::handleCollisions()
     tbb::parallel_for(0, size, 1, [=](int i)
     {
         float OFFSET_CELL_WIDTH = CELL_WIDTH + .01;
-        Particle *p = box->particles[i];
         // Check to see if p is inside bounding volume
         if (p->pos[0] < (box->min_x + CELL_WIDTH)
             || p->pos[0] > (box->max_x - CELL_WIDTH))
@@ -868,17 +838,17 @@ void FlipSolver::gridVelocityToParticle()
         float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
         float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
         
-//        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
-//        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
-//        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
-//        
 //        p->velocity[0] = pic_x;
 //        p->velocity[1] = pic_y;
 //        p->velocity[2] = pic_z;
+//        
+//        p->velocity[0] = flip_x;
+//        p->velocity[1] = flip_y;
+//        p->velocity[2] = flip_z;
 
-        p->velocity[0] = flip_x;
-        p->velocity[1] = flip_y;
-        p->velocity[2] = flip_z;
+        p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
+        p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
+        p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
 
         std::cout << p->velocity[1] << std::endl;
     }
