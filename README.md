@@ -5,6 +5,9 @@ Hello!
 
 All required functionality implemented, although I plan to go back and change my collision so that things are deleted properly as opposed to just changing color.
 
+Next up:
+I plan to find a way to export my particles and positions to Houdini so that I can create a lego fluid effect, as depicted here: http://gfycat.com/TautExcellentGrouper, created by Ryan Guy.
+
 #Controls
 
 UP: zoom in
