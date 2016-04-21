@@ -14,13 +14,13 @@ static const float RAD2DEG = 180.f / PI;
 Camera::Camera():
     Camera(400, 300)
 {
-    look = glm::vec3(0,0,-1);
-    up = glm::vec3(0,1,0);
-    right = glm::vec3(1,0,0);
+    look = ref - eye;
+    right = glm::cross(world_up, look);
+    up = glm::normalize(glm::cross(look, right));
 }
 
 Camera::Camera(unsigned int w, unsigned int h):
-    Camera(w, h, glm::vec3(0,0,15), glm::vec3(0,0,0), glm::vec3(0,1,0))
+    Camera(w, h, glm::vec3(0,0,10), glm::vec3(0,0,0), glm::vec3(0,1,0))
 {}
 
 Camera::Camera(unsigned int w, unsigned int h, const glm::vec3 &e, const glm::vec3 &r, const glm::vec3 &worldUp):

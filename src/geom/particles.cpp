@@ -30,10 +30,17 @@ void ParticleContainer::initParticles(const glm::vec3 &bounds, const glm::vec3 &
     for (float i=-centered_bounds[0]; i < centered_bounds[0]; i += separation) {
         for (float j=-centered_bounds[1]; j < centered_bounds[1]; j += separation) {
             for (float k=-centered_bounds[2]; k < centered_bounds[2]; k += separation) {
+                
                 glm::vec3 pos(i, j, k);
+                pos += 0.25f;
                 glm::vec3 vel = glm::vec3(0.f, 0.f, 0.f);
-                particles.push_back(new Particle(pos, vel));
-                //std::cout << vel[0] << " " << vel[1] << " " << vel[2] << std::endl;
+                Particle *p = new Particle(pos, vel);
+                if (fabs(i - centered_bounds[0]) >= (3.0 - separation) && fabs(k - centered_bounds[2]) >= (3.0 - separation)) {
+                    p->color = glm::vec3(1.0f, 0.f, 0.f);
+                }
+
+                particles.push_back(p);
+                
             }
         }
     }

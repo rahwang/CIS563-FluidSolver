@@ -83,10 +83,8 @@ public:
 
     void clearVelocity()
     {
-        cells.clear();
-        totalWeight.clear();
-        cells = std::vector<T>(x_dim*y_dim*z_dim, 0.f);
-        totalWeight = std::vector<float>(x_dim*y_dim*z_dim, 0.f);
+        std::fill(cells.begin(), cells.end(), 0.f);
+        std::fill(totalWeight.begin(), totalWeight.end(), 0.f);
     }
     
     void copyCells(Grid &dst_grid)
@@ -96,7 +94,7 @@ public:
 
     void clear()
     {
-        cells = std::vector<T>(x_dim*y_dim*z_dim, 0);
+        std::fill(cells.begin(), cells.end(), 0);
     }
 
     void printGrid()
@@ -125,13 +123,13 @@ public:
         int size = cells.size();
         tbb::parallel_for(0, size, 1, [=](int i)
         {
-            cells[i] /= MATHIF(particleCount[i] > 0, particleCount[i], 1.0f);
+            cells[i] /= MATHIF(totalWeight[i] > 0, totalWeight[i], 1.0f);
         }
 #else
         int numCells = cells.size();
         for (int i=0; i < numCells; ++i)
         {
-            cells[i] /= MATHIF(totalWeight[i] > 0, totalWeight[i], 1.0f);
+            cells[i] /= MATHIF(totalWeight[i] > 0.01f, totalWeight[i], 1.0f);
         }
 #endif
     }

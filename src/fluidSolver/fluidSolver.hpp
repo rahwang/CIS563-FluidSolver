@@ -33,8 +33,8 @@ public:
 
   void step();
 
-  glm::vec3 getVelocityGridIndex(const glm::vec3 &pos, int dim);
-  glm::vec3 getGridIndex(const glm::vec3 &pos);
+  glm::ivec3 getVelocityGridIndex(const glm::vec3 &pos, int dim);
+  glm::ivec3 getGridIndex(const glm::vec3 &pos);
 
   void constructMacGrid(int x, int y, int z);
   void storeParticleVelocityToGridComponent(Particle *p, Grid<float> &grid, int dim);
@@ -55,6 +55,7 @@ public:
   void computePressure();
   void assemblePressureSolveCoefficients(std::vector<Tri> &coefficients);
   void checkTypes();
+  bool InBounds(int i, int j, int k);
 
   MacGrid macgrid;
 };

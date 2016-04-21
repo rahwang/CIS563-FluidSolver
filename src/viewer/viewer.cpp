@@ -24,21 +24,21 @@ void Viewer::render() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (glfwGetKey(window, GLFW_KEY_UP ) == GLFW_PRESS) {
-            camera.TranslateAlongLook(.5f);
+            camera.TranslateAlongLook(.25f);
         } else if (glfwGetKey(window, GLFW_KEY_DOWN ) == GLFW_PRESS) {
-            camera.TranslateAlongLook(-.5f);
+            camera.TranslateAlongLook(-.25f);
         } else if (glfwGetKey(window, GLFW_KEY_LEFT ) == GLFW_PRESS) {
-            camera.TranslateAlongRight(-.5f);
+            camera.TranslateAlongRight(-.25f);
         } else if (glfwGetKey(window, GLFW_KEY_RIGHT ) == GLFW_PRESS) {
-            camera.TranslateAlongRight(.5f);
+            camera.TranslateAlongRight(.25f);
         } else if (glfwGetKey(window, GLFW_KEY_W ) == GLFW_PRESS) {
-            camera.RotateAboutRight(-10);
+            camera.RotateAboutRight(-20);
         } else if (glfwGetKey(window, GLFW_KEY_S ) == GLFW_PRESS) {
-            camera.RotateAboutRight(10);
+            camera.RotateAboutRight(20);
         } else if (glfwGetKey(window, GLFW_KEY_A ) == GLFW_PRESS) {
-            camera.RotateAboutUp(-10);
+            camera.RotateAboutUp(-20);
         } else if (glfwGetKey(window, GLFW_KEY_D ) == GLFW_PRESS) {
-            camera.RotateAboutUp(10);
+            camera.RotateAboutUp(20);
         }
 
 

@@ -9,6 +9,23 @@
 #include <vector>
 #include "geom.hpp"
 
+class Marks : public Geometry
+{
+public:
+    Marks() {
+        name = "PARTICLES";
+        draw_type = GL_POINTS;
+        transform = glm::mat4(1.0f);
+    }
+    virtual ~Marks();
+    
+    std::vector<glm::vec3> pos;
+    std::vector<glm::vec3> color;
+    //virtual void create();
+    //void init();
+
+};
+
 class Particle
 {
 public:
