@@ -14,7 +14,7 @@
 
 #define GRAVITY -9.8f
 #define TIME_STEP (1.0f/100.f)
-#define RES 4
+#define RES 3
 #define CELL_WIDTH (1.f/RES)
 #define DENSITY 1.f
 #define PARTICLES_PER_CELL 1
@@ -46,7 +46,7 @@ void FlipSolver::step()
     applyGravity();
     enforceBoundaryConditions();
     
-//    computePressure();
+    computePressure();
     //extrapolateVelocity();
     enforceBoundaryConditions();
     // Update particle velocities.
@@ -624,7 +624,7 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
     int jj = j + 1;
     int kk = k + 1;
     
-    glm::vec3 local_pos = p->pos;
+    glm::vec3 local_pos = p->pos - glm::vec3(box->min_x, box->min_y, box->min_z);
     local_pos[(dim + 1) % 3] -= (0.5f * CELL_WIDTH);
     local_pos[(dim + 2) % 3] -= (0.5f * CELL_WIDTH);
     
@@ -794,7 +794,7 @@ float FlipSolver::interpolateVelocityComponent(Particle *p, const Grid<float> &g
     int jj = next_idx[1];
     int kk = next_idx[2];
     
-    glm::vec3 local_pos = p->pos;
+    glm::vec3 local_pos = p->pos - glm::vec3(box->min_x, box->min_y, box->min_z);
     local_pos[(dim + 1) % 3] -= (0.5f * CELL_WIDTH);
     local_pos[(dim + 2) % 3] -= (0.5f * CELL_WIDTH);
     
