@@ -14,7 +14,7 @@
 
 #define GRAVITY -9.8f
 #define TIME_STEP (1.0f/100.f)
-#define RES 3
+#define RES 2
 #define CELL_WIDTH (1.f/RES)
 #define DENSITY 1.f
 #define PARTICLES_PER_CELL 1
@@ -47,7 +47,7 @@ void FlipSolver::step()
     enforceBoundaryConditions();
     
     computePressure();
-    //extrapolateVelocity();
+    extrapolateVelocity();
     enforceBoundaryConditions();
     // Update particle velocities.
     gridVelocityToParticle();
@@ -632,9 +632,9 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
     float y_uVal = std::max(0.f, (local_pos[1] - j * CELL_WIDTH) / CELL_WIDTH);
     float z_uVal = std::max(0.f, (local_pos[2] - k * CELL_WIDTH) / CELL_WIDTH);
 
-    if (x_uVal < -0.01 || x_uVal > 1.01 || y_uVal < -0.01 || y_uVal > 1.01 || z_uVal < -0.01 || z_uVal > 1.01) {
-        int x = 5;
-    }
+//    if (x_uVal < -0.01 || x_uVal > 1.01 || y_uVal < -0.01 || y_uVal > 1.01 || z_uVal < -0.01 || z_uVal > 1.01) {
+//        int x = 5;
+//    }
     
     // (i, j, k)
     float weight1 = (1-x_uVal) * (1-y_uVal) * (1-z_uVal);
@@ -798,9 +798,9 @@ float FlipSolver::interpolateVelocityComponent(Particle *p, const Grid<float> &g
     local_pos[(dim + 1) % 3] -= (0.5f * CELL_WIDTH);
     local_pos[(dim + 2) % 3] -= (0.5f * CELL_WIDTH);
     
-    float x_uVal = std::max(0.f, (local_pos[0] - i * CELL_WIDTH) / CELL_WIDTH);
-    float y_uVal = std::max(0.f, (local_pos[1] - j * CELL_WIDTH) / CELL_WIDTH);
-    float z_uVal = std::max(0.f, (local_pos[2] - k * CELL_WIDTH) / CELL_WIDTH);
+    float x_uVal = std::min(1.0f, std::max(0.f, (local_pos[0] - i * CELL_WIDTH) / CELL_WIDTH));
+    float y_uVal = std::min(1.0f, std::max(0.f, (local_pos[1] - j * CELL_WIDTH) / CELL_WIDTH));
+    float z_uVal = std::min(1.0f, std::max(0.f, (local_pos[2] - k * CELL_WIDTH) / CELL_WIDTH));
 
     // Do x direction.
     float tmp1 = MATHIF(i!=ii, lerp(grid(i, j, k), grid(ii, j, k), x_uVal), grid(i, j, k));
