@@ -16,11 +16,11 @@ Camera::Camera():
 {
     look = glm::normalize(ref - eye);
     right = glm::normalize(glm::cross(look, world_up));
-    up = glm::cross(right, look);
+    up = glm::normalize(glm::cross(right, look));
 }
 
 Camera::Camera(unsigned int w, unsigned int h):
-    Camera(w, h, glm::vec3(0,0,15), glm::vec3(0,0,0), glm::vec3(0,1,0))
+    Camera(w, h, glm::vec3(0.1,10,0), glm::vec3(0,0,0), glm::vec3(0,1,0))
 {}
 
 Camera::Camera(unsigned int w, unsigned int h, const glm::vec3 &e, const glm::vec3 &r, const glm::vec3 &worldUp):
@@ -80,7 +80,7 @@ void Camera::RecomputeAttributes()
 {
     look = glm::normalize(ref - eye);
     right = glm::normalize(glm::cross(look, world_up));
-    up = glm::cross(right, look);
+    up = glm::normalize(glm::cross(right, look));
 
     float tan_fovy = tan(fovy/2 * DEG2RAD);
     float len = glm::length(ref - eye);
@@ -154,20 +154,17 @@ void Camera::TranslateAlongLook(float amt)
 {
     glm::vec3 translation = look * amt;
     eye += translation;
-    ref += translation;
 }
 
 void Camera::TranslateAlongRight(float amt)
 {
     glm::vec3 translation = right * amt;
     eye += translation;
-    ref += translation;
 }
 void Camera::TranslateAlongUp(float amt)
 {
     glm::vec3 translation = up * amt;
     eye += translation;
-    ref += translation;
 }
 
 GLenum Camera::drawMode(){return GL_LINES;}

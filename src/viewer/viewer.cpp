@@ -32,13 +32,13 @@ void Viewer::render() {
         } else if (glfwGetKey(window, GLFW_KEY_RIGHT ) == GLFW_PRESS) {
             camera.TranslateAlongRight(.5f);
         } else if (glfwGetKey(window, GLFW_KEY_W ) == GLFW_PRESS) {
-            camera.RotateAboutRight(-10);
+            camera.RotateAboutRight(-20);
         } else if (glfwGetKey(window, GLFW_KEY_S ) == GLFW_PRESS) {
-            camera.RotateAboutRight(10);
+            camera.RotateAboutRight(20);
         } else if (glfwGetKey(window, GLFW_KEY_A ) == GLFW_PRESS) {
-            camera.RotateAboutUp(-10);
+            camera.RotateAboutUp(-20);
         } else if (glfwGetKey(window, GLFW_KEY_D ) == GLFW_PRESS) {
-            camera.RotateAboutUp(10);
+            camera.RotateAboutUp(20);
         }
 
 
