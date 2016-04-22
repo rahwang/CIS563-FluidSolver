@@ -14,9 +14,9 @@ static const float RAD2DEG = 180.f / PI;
 Camera::Camera():
     Camera(400, 300)
 {
-    look = glm::vec3(0,0,-1);
-    up = glm::vec3(0,1,0);
-    right = glm::vec3(1,0,0);
+    look = glm::normalize(ref - eye);
+    right = glm::normalize(glm::cross(look, world_up));
+    up = glm::cross(right, look);
 }
 
 Camera::Camera(unsigned int w, unsigned int h):
