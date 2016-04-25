@@ -125,13 +125,14 @@ public:
         int size = cells.size();
         tbb::parallel_for(0, size, 1, [=](int i)
         {
-            cells[i] /= MATHIF(particleCount[i] > 0, particleCount[i], 1.0f);
+            cells[i] /= MATHIF(totalWeight[i] > 0.01, totalWeight[i], 1.0f);
+
         }
 #else
         int numCells = cells.size();
         for (int i=0; i < numCells; ++i)
         {
-            cells[i] /= MATHIF(totalWeight[i] > 0, totalWeight[i], 1.0f);
+            cells[i] /= MATHIF(totalWeight[i] > 0.01, totalWeight[i], 1.0f);
         }
 #endif
     }

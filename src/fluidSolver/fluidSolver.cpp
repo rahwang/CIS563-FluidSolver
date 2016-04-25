@@ -12,9 +12,9 @@
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 
-#define GRAVITY -9.8f
+#define GRAVITY -19.8f
 #define TIME_STEP (1.0f/100.f)
-#define RES 2
+#define RES 7
 #define CELL_WIDTH (1.f/RES)
 #define DAMPING 1.0f
 #define DENSITY 1.f
@@ -41,9 +41,9 @@ void FlipSolver::step()
     // Zero velocities pointing into solid cells.
     applyGravity();
     enforceBoundaryConditions();
-    //computePressure();
+    computePressure();
     
-    //extrapolateVelocity();
+    extrapolateVelocity();
     enforceBoundaryConditions();
 
     // Update particle velocities.
@@ -103,7 +103,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (right_mark == macgrid.marker.FLUID)
+                    if (right_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -116,7 +116,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (left_mark == macgrid.marker.FLUID)
+                    if (left_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -129,7 +129,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (up_mark == macgrid.marker.FLUID)
+                    if (up_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -142,7 +142,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (down_mark == macgrid.marker.FLUID)
+                    if (down_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -155,7 +155,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (front_mark == macgrid.marker.FLUID)
+                    if (front_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -168,7 +168,7 @@ void FlipSolver::assemblePressureSolveCoefficients(std::vector<Tri> &coefficient
                     {
                         count++;
                     }
-                    else if (behind_mark == macgrid.marker.FLUID)
+                    if (behind_mark == macgrid.marker.FLUID)
                     {
                         count++;
                         coefficients.push_back(Tri(curr_idx,
@@ -353,7 +353,7 @@ void FlipSolver::extrapolateVelocityComponent(const Grid<int>& tmp, Grid<float>&
     {
         for (int j=0; j < grid.y_dim; ++j)
         {
-            for (int k=0; k < tmp.z_dim; ++k)
+            for (int k=0; k < grid.z_dim; ++k)
             {
                 if (grid.flatIdx(i, j, k) == 1451) {
                     int x =1;
@@ -605,10 +605,10 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
     int j = curr_idx[1];
     int k = curr_idx[2];
 
-    if (macgrid.marker(i, j, k) == macgrid.marker.SOLID)
-    {
-        return;
-    }
+//    if (macgrid.marker(i, j, k) == macgrid.marker.SOLID)
+//    {
+//        return;
+//    }
 
     
     for (int n=0; n < 2; ++n)
@@ -628,7 +628,7 @@ void FlipSolver::storeParticleVelocityToGridComponent(Particle *p, Grid<float> &
                                       box->min_z + K * CELL_WIDTH);
                     face_pos[(dim + 1) % 3] += 0.5f * CELL_WIDTH;
                     face_pos[(dim + 2) % 3] += 0.5f * CELL_WIDTH;
-                    float weight = glm::length(face_pos-p->pos) / (CELL_WIDTH * 2);
+                    float weight = glm::length(face_pos - p->pos) / (CELL_WIDTH * 2);
                     
                     // Store velocity contribution and increment particle counter.
                     grid(I, J, K) += weight * p->velocity[dim];
@@ -690,10 +690,13 @@ glm::vec3 FlipSolver::getVelocityGridIndex(const glm::vec3 &pos, int dim)
     int j = int(floor((p[1] - box->min_y) / CELL_WIDTH));
     int k = int(floor((p[2] - box->min_z) / CELL_WIDTH));
     
+    glm::vec3 maxes(macgrid.marker.x_dim, macgrid.marker.y_dim, macgrid.marker.z_dim);
+    maxes[dim] += 1;
+    
     // Clamp values.
-    i = std::min(std::max(i, 0), int(std::ceil(macgrid.marker.x_dim -1)));
-    j = std::min(std::max(j, 0), int(std::ceil(macgrid.marker.y_dim -1)));
-    k = std::min(std::max(k, 0), int(std::ceil(macgrid.marker.z_dim -1)));
+    i = std::min(std::max(i, 0), int(std::ceil(maxes[0] -1)));
+    j = std::min(std::max(j, 0), int(std::ceil(maxes[1] -1)));
+    k = std::min(std::max(k, 0), int(std::ceil(maxes[2] -1)));
     
     return glm::vec3(i, j, k);
 }
@@ -745,6 +748,9 @@ float FlipSolver::interpolateVelocityComponent(Particle *p, const Grid<float> &g
     float x_uVal = std::max(0.f, (p->pos[0] - cell_min[0]) / CELL_WIDTH);
     float y_uVal = std::max(0.f, (p->pos[1] - cell_min[1]) / CELL_WIDTH);
     float z_uVal = std::max(0.f, (p->pos[2] - cell_min[2]) / CELL_WIDTH);
+    
+    if (x_uVal < 0 || y_uVal < 0 || z_uVal < 0 || x_uVal > 1 || y_uVal > 1 || z_uVal > 1)
+        int c = 0;
 
     // Do x direction.
     float tmp1 = MATHIF(i!=ii, lerp(grid(i, j, k), grid(ii, j, k), x_uVal), grid(i, j, k));
@@ -820,7 +826,7 @@ void FlipSolver::gridVelocityToParticle()
 //        p->velocity[0] = pic_x;
 //        p->velocity[1] = pic_y;
 //        p->velocity[2] = pic_z;
-//        
+//
 //        p->velocity[0] = flip_x;
 //        p->velocity[1] = flip_y;
 //        p->velocity[2] = flip_z;
