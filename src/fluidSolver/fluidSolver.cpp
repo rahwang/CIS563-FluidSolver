@@ -287,14 +287,6 @@ void FlipSolver::computePressure()
     }
     
     
-    // Color particles
-    for (Particle *pt : box->particles)
-    {
-        glm::vec3 idx = getGridIndex(pt->pos);
-        pt->color[2] = 1.f - p[macgrid.marker.flatIdx(idx[0], idx[1], idx[2])];
-    }
-    
-    
     // Check resulting divergences.
     for (int i=1; i < macgrid.marker.x_dim-1; ++i)
     {
@@ -823,19 +815,24 @@ void FlipSolver::gridVelocityToParticle()
         float flip_y = p->velocity[1] + interpolateVelocityComponent(p, macgrid.v_old, 1);
         float flip_z = p->velocity[2] + interpolateVelocityComponent(p, macgrid.w_old, 2);
         
-//        p->velocity[0] = pic_x;
-//        p->velocity[1] = pic_y;
-//        p->velocity[2] = pic_z;
-//
-//        p->velocity[0] = flip_x;
-//        p->velocity[1] = flip_y;
-//        p->velocity[2] = flip_z;
+        //        p->velocity[0] = pic_x;
+        //        p->velocity[1] = pic_y;
+        //        p->velocity[2] = pic_z;
+        //
+        //        p->velocity[0] = flip_x;
+        //        p->velocity[1] = flip_y;
+        //        p->velocity[2] = flip_z;
 
         p->velocity[0] = 0.05f * pic_x + 0.95f * flip_x;
         p->velocity[1] = 0.05f * pic_y + 0.95f * flip_y;
         p->velocity[2] = 0.05f * pic_z + 0.95f * flip_z;
-
-        //std::cout << p->velocity[1] << std::endl;
+        
+        // Color particles
+        float diff = fabsf(p->velocity[0]) + fabsf(p->velocity[1]) + fabsf(p->velocity[2]);
+        float c = std::min(std::max(((diff) / 25.f), 0.f), 1.0f);
+        p->color[0] = c;
+        p->color[1] = c;
+        p->color[2] = 0.5f + c/2;
     }
 #endif
 }

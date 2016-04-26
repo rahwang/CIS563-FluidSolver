@@ -99,7 +99,7 @@ void Viewer::Init()
     glfwSetInputMode(window, GLFW_STICKY_KEYS, GL_TRUE);
 
     // Background
-    glClearColor(0.9f, 0.9f, 0.9f, 0.0f);
+    glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 
     // Enable depth test
     glEnable(GL_DEPTH_TEST);
