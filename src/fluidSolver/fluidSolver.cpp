@@ -4,6 +4,12 @@
 
 //#define DEBUG
 
+#include <openvdb/openvdb.h>
+#include <openvdb_points/openvdb.h>
+#include <openvdb_points/tools/PointDataGrid.h>
+#include <openvdb_points/tools/PointConversion.h>
+#include <openvdb_points/tools/PointCount.h>
+
 #include "fluidSolver.hpp"
 #include <iostream>
 #include <tbb/tbb.h>
@@ -11,6 +17,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
+
+#include <string.h>
 
 #define GRAVITY -19.8f
 #define TIME_STEP (1.0f/100.f)
@@ -50,6 +58,7 @@ void FlipSolver::step()
     gridVelocityToParticle();
     updateParticlePositions();
     handleCollisions();
+    WriteToVDB();
 #ifdef DEBUG
     iter++;
     std::cout << "ITER: " << iter << std::endl;
@@ -835,4 +844,45 @@ void FlipSolver::gridVelocityToParticle()
         p->color[2] = 0.5f + c/2;
     }
 #endif
+}
+
+
+void FlipSolver::WriteToVDB()
+{
+    using namespace openvdb::tools;
+    
+    // Initialize the OpenVDB and OpenVDB Points library.  This must be called at least
+    // once per program and may safely be called multiple times.
+    openvdb::initialize();
+    openvdb::points::initialize();
+    
+    // Create some point positions
+    std::vector<openvdb::Vec3f> positions;
+    positions.clear();
+    
+    for (Particle *p : box->particles)
+    {
+        positions.push_back(openvdb::Vec3f(p->pos[0], p->pos[1], p->pos[2]));
+    }
+    
+    // Create a linear transform with voxel size of 10.0
+    const float voxelSize = 1.f;
+    openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform();
+    
+    // Create the PointDataGrid, position attribute is mandatory
+    PointDataGrid::Ptr pointDataGrid = createPointDataGrid<PointDataGrid>(                                                    positions, TypedAttributeArray<openvdb::Vec3f>::attributeType(), *transform);
+    
+    
+    // Create a VDB file object.
+    std::string fname = "fluid_" + std::to_string(iter) + ".vdb";
+    openvdb::io::File file(fname);
+    iter++;
+    
+    // Add the grid pointer to a container.
+    openvdb::GridPtrVec grids;
+    grids.push_back(pointDataGrid);
+    
+    // Write out the contents of the container.
+    file.write(grids);
+    file.close();
 }

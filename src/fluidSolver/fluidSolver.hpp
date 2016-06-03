@@ -55,6 +55,7 @@ public:
   void computePressure();
   void assemblePressureSolveCoefficients(std::vector<Tri> &coefficients);
   void checkTypes();
+  void WriteToVDB();
 
   MacGrid macgrid;
 };

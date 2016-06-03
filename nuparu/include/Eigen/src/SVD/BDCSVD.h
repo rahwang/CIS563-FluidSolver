@@ -333,7 +333,7 @@ void BDCSVD<MatrixType>::structured_update(Block<MatrixXr,Dynamic,Dynamic> A, co
     Map<MatrixXr> A1(m_workspace.data()      , n1, n);
     Map<MatrixXr> A2(m_workspace.data()+ n1*n, n2, n);
     Map<MatrixXr> B1(m_workspace.data()+  n*n, n,  n);
-    Map<MatrixXr> B2(m_workspace.data()+2*n*n, n,  n);
+    Map<MatrixXr> Btwo(m_workspace.data()+2*n*n, n,  n);
     Index k1=0, k2=0;
     for(Index j=0; j<n; ++j)
     {
@@ -346,13 +346,13 @@ void BDCSVD<MatrixType>::structured_update(Block<MatrixXr,Dynamic,Dynamic> A, co
       if( (A.col(j).tail(n2).array()!=0).any() )
       {
         A2.col(k2) = A.col(j).tail(n2);
-        B2.row(k2) = B.row(j);
+        Btwo.row(k2) = B.row(j);
         ++k2;
       }
     }
   
     A.topRows(n1).noalias()    = A1.leftCols(k1) * B1.topRows(k1);
-    A.bottomRows(n2).noalias() = A2.leftCols(k2) * B2.topRows(k2);
+    A.bottomRows(n2).noalias() = A2.leftCols(k2) * Btwo.topRows(k2);
   }
   else
   {

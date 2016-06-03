@@ -93,7 +93,7 @@ void Scene::drawScene(GLuint &programID, GLuint &MatrixID, Camera &camera) {
                     );
 
         // Draw the triangle !
-        glPointSize(3);
+        glPointSize(2);
         glDrawArrays(geom->draw_type, 0, geom->num_indicies); // 12*3 indices starting at 0 -> 12 triangles
 
         glDisableVertexAttribArray(0);
