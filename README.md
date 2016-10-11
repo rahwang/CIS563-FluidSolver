@@ -3,7 +3,9 @@
 
 Hello!
 
-All required functionality implemented, although I plan to go back and change my collision so that things are deleted properly as opposed to just changing color.
+This is a fluid solver and OpenGL particle viewer that I created for CIS563:Physically-Based Animation. The fluid solver uses the FLIP/PIC algorithm, which is much too complicated for me to do justice here. Instead, I link you to the original SIGGRAPH paper, a veritable masterpiece: https://www.cs.ubc.ca/~rbridson/docs/zhu-siggraph05-sandfluid.pdf
+
+Although there's still much to be done here, I'm quite proud of this simulator -- I consider it to be some of the trickiest implementation I've ever tackled. 
 
 Next up:
 I plan to find a way to export my particles and positions to Houdini so that I can create a lego fluid effect, as depicted here: http://gfycat.com/TautExcellentGrouper, created by Ryan Guy.
